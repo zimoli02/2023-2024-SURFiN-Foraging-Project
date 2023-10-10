@@ -1,0 +1,145 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath}
+\usepackage{accents}
+
+\title{LDS Book Proofs: State Smoothing}
+\author{Zimo Li}
+\date{04 October 2023}
+
+\begin{document}
+
+\maketitle
+
+\section{Regression Lemma}
+
+Suppose that \(x\) and \(y\) are jointly normally distributed variables with:
+
+\[
+E
+\begin{bmatrix}
+x\\
+y
+\end{bmatrix}
+=
+\begin{bmatrix}
+\mu_{x}\\
+\mu_{y}
+\end{bmatrix} \text{, }\quad
+\centering
+Var
+\begin{bmatrix}
+x\\
+y
+\end{bmatrix}
+=
+\begin{bmatrix}
+\sigma_{x}^2 & \sigma_{xy}\\
+\sigma_{xy} & \sigma_{y}^2
+\end{bmatrix},
+\]\\
+
+\par\noindent
+Then the \(E\) and \(Var\) of \(x\) given \(y\) would be:
+\[
+E(x|y) = \mu_x + \frac{\sigma_{xy}}{\sigma_{y}^2}(y-\mu_{y})\text{, }\quad
+Var(x|y) = \sigma_{x}^2 - \frac{\sigma_{xy}^2}{\sigma_{y}^2}
+\]
+
+\section{Expectation of Smoothed State \(\hat{\alpha_t}\)}
+
+We define  \(\hat{\alpha_t}\) as \(E(\alpha_{t}|Y_{n})\). \\
+\par\noindent
+We know that \(v_1, \cdots, v_n\) are mutually independent and \(v_t, \cdots, v_n\) are independent of \(y_1, \cdots, y_t-1\) with zero means.\\
+\par\noindent
+We also know that when \(Y_n\) is fixed, \(y_1, \cdots, y_t-1\) and \(v_t, \cdots, v_n\) are fixed and vice versa.\\
+\par\noindent
+Therefore, we have:
+
+\begin{align}
+    p(\alpha_{t}|Y_{n}) &=  p(\alpha_{t}|Y_{t-1}, v_t, \cdots, v_n)\\
+    &= \frac{p(\alpha_{t}, v_t, \cdots, v_n|Y_{t-1})}{p(v_t, \cdots, v_n|Y_{t-1})}\\
+    &= p(\alpha_{t}| (v_t, \cdots, v_n | Y_{t-1}))
+\end{align}
+
+\par\noindent
+Let \(x = \alpha_{t}\) and \(y = v_t, \cdots, v_n | Y_{t-1} = v_{t-n} \), we have:
+
+\begin{align}
+    E(\alpha_{t}|Y_{n}) &= E(\alpha_{t} | (v_t, \cdots, v_n | Y_{t-1}))\\
+    &= E(x|y)\\
+    &= \mu_x + \frac{\sigma_{xy}}{\sigma_{y}^2}(y-\mu_{y})\\
+    &= E(\alpha_{t}) + \frac{Cov(\alpha_{t}, v_{t-n})}{\sigma_{v_{t-n}}^2}(v_{t-n}-E[v_{t-n}])\\
+    &= a_t + \frac{\sum_{j=t}^{n}Cov(\alpha_{t}, v_{j})}{F_{t-n}}(v_{t-n}-0)\\
+    &= a_t + \sum_{j=t}^{n}Cov(\alpha_{t}, v_{j})F_{j}^{-1}v_{j}
+\end{align}
+
+\par\noindent
+To calculate \(Cov(\alpha_{t}, v_{j})\), we have:
+\begin{align}
+    Cov(\alpha_{t}, v_{j}) &= Cov(x_{t} + a_{t}, v_{j})\\
+    &= Cov(x_{t}, v_{j}) \\
+    &= Cov(x_{t}, x_{j} + \epsilon_{j})\\
+\intertext{if  \(j = t\):}
+    Cov(x_{t}, x_{j} + \epsilon_{j}) &=Cov(x_{t}, x_{t} + \epsilon_{t})\\
+    &= E[(x_{t} - E[x_{t}]) (x_{t} + \epsilon_{t} - E[x_{t} + \epsilon_{t} ])]\\
+    &= E[x_{t} (x_{t} + \epsilon_{t})]\\
+    &= E[(x_{t})^2]\\ 
+    &= Var[x_t]\\
+    &= P_t\\
+\intertext{if  \(j > t\):}
+    Cov(x_{t}, x_{j} + \epsilon_{j}) &= E[x_{t} (x_{j} + \epsilon_{j})]\\
+    &= E[x_{t} (L_{j-1}x_{j-1} +\eta_{j-1}-K_{j-1} \epsilon_{j-1})]\\
+    &= E[x_{t} (L_{j-1}x_{j-1} +\eta_{j-1}-(1-L_{j-1}) \epsilon_{j-1})]\\
+    &= E[L_{j-1}x_{t}(x_{j-1} + \epsilon_{j-1})] + E[x_{t}\eta_{j-1}]+ E[x_{t}\epsilon_{j-1}]\\
+    &= E[L_{j-1}x_{t}(x_{j-1} + \epsilon_{j-1})] \\
+    &= L_{j-1} Cov(x_{t}, x_{j-1} + \epsilon_{j-1})\\
+\intertext{Therefore:}
+    Cov(\alpha_{t}, v_{j})
+    &= 
+    \begin{cases}
+    P_t & \text{for }j = t\\ 
+    P_t\sum_{k=t}^{j-1}L_{k} & \text{for }  j > t
+    \end{cases} \label{eq:covariance}\\
+\end{align}
+
+\par\noindent
+Let \(r_{t-1} =\frac{1}{P_t}\sum_{j=t}^{n}Cov(\alpha_{t}, v_{j})F_{j}^{-1}v_{j}\), we have:
+\begin{align}
+    r_{t-1} &=\frac{v_t}{F_t} + \sum_{j=t+1}^{n}\frac{v_{j}}{F_{j}}\prod_{k=t}^{j-1}L_k\\
+    E(\alpha_{t}|Y_{n}) &= a_t + \sum_{j=t}^{n}Cov(\alpha_{t}, v_{j})F_{j}^{-1}v_{j}\\
+    &= a_t + P_t r_{t-1}
+\end{align}
+
+\par\noindent
+Since \(r_n = 0\), \(\hat{\alpha_t}\) could be derived:
+\begin{align}
+    r_{t-1} &= L_tr_t + \frac{v_t}{F_t}\\
+    \hat{\alpha_t} &= a_t  + P_tr_{t-1}
+\end{align}
+
+\section{Variance of Smoothed State \(V_t\)}
+
+Corresponding to previous assumptions \(x = \alpha_{t}\) and \(y = v_t, \cdots, v_n | Y_{t-1} = v_{t-n} \), we have:
+\begin{align}
+    V_t &= Var(\alpha_{t}|Y_{n})\\
+    &= Var(\alpha_{t} | (v_t, \cdots, v_n | Y_{t-1}))\\
+    &= Var(x|y)\\
+    &= \sigma_{x}^2 - \frac{\sigma_{xy}^2}{\sigma_{y}^2}\\
+    &= P_t - \sum_{j=t}^{n}(Cov(\alpha_{t}, v_{j}))^2 F_{j}^{-1}
+\end{align}
+
+\par\noindent
+Use Eq.~\ref{eq:covariance}, we have:
+\begin{align}
+    V_t &= P_t - \sum_{j=t}^{n}(Cov(\alpha_{t}, v_{j}))^2 F_{j}^{-1}\\
+    &= P_t - P_t^2N_{t-1}\\
+\intertext{where} N_{t-1} &= \frac{1}{F_t} + \sum_{j=t+1}^{n}\frac{1}{F_{j}}\prod_{k=t}^{j-1}L_k^2
+\end{align}
+\par\noindent
+Similar as before, we have  \(N_n = 0\), therefore we could derive \(V_t\) from \(V_n\):
+\begin{align}
+     N_{t-1} &= L_t^2N_t + \frac{1}{F_t}\\
+     V_{t-1} &= P_t - P_t^2N_{t-1}
+\end{align}
+\end{document}
