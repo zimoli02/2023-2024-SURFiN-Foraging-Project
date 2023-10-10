@@ -15,8 +15,8 @@ jobs:
     - name: Install TeXLive
       run: |
         sudo apt-get -y update
-        sudo apt-get -y install texlive-latex-base texlive-fonts-recommended texlive-fonts-extra texlive-latex-extra
-
+        sudo apt-get -y install texlive-latex-base texlive-fonts-recommended texlive-fonts-extra texlive-latex-extra texlive-science # added texlive-science
+    
     - name: Compile LaTeX document
       run: |
         cd "D&K Books"
