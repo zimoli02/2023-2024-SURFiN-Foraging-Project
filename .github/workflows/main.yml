@@ -1,0 +1,26 @@
+name: Build LaTeX documents
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        latex_file: ['Equation 2.32.tex']
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    
+    - name: Install TeXLive
+      run: |
+        sudo apt-get -y update
+        sudo apt-get -y install texlive-latex-base texlive-fonts-recommended texlive-fonts-extra texlive-latex-extra
+    
+    - name: Compile LaTeX document
+      run: pdflatex ${{ matrix.latex_file }}
+    
+    - name: Upload PDF
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.latex_file }}
+        path: ${{ matrix.latex_file }}.pdf
