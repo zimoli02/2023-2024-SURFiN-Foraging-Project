@@ -1,4 +1,4 @@
-name: Build LaTeX documents
+name: Build and Push Multiple LaTeX documents
 on: [push]
 
 jobs:
@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        latex_file: ['Equation 2.32.tex']
+        tex_file: ['Equation 2.32.tex']
     steps:
     - name: Check out repository
       uses: actions/checkout@v2
@@ -17,10 +17,12 @@ jobs:
         sudo apt-get -y install texlive-latex-base texlive-fonts-recommended texlive-fonts-extra texlive-latex-extra
     
     - name: Compile LaTeX document
-      run: pdflatex ${{ matrix.latex_file }}
+      run: pdflatex ${{ matrix.tex_file }}
     
-    - name: Upload PDF
-      uses: actions/upload-artifact@v2
-      with:
-        name: ${{ matrix.latex_file }}
-        path: ${{ matrix.latex_file }}.pdf
+    - name: Push PDFs back to repository
+      run: |
+        git config --global user.name 'GitHub Action'
+        git config --global user.email 'action@github.com'
+        git add *.pdf
+        git commit -m "Add compiled PDFs"
+        git push https://${{secrets.GH_TOKEN}}@github.com/zimoli02/2023-2024-SURFiN-Foraging-Project/D&K Books.git HEAD:main
