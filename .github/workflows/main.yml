@@ -26,6 +26,6 @@ jobs:
       run: |
         git config --global user.name 'GitHub Action'
         git config --global user.email 'action@github.com'
-        git add D&K\ Books/*.pdf
+        git add "D&K Books/*.pdf"
         git commit -m "Add compiled PDFs"
         git push https://${{ secrets.LATEX_TOKEN }}@github.com/zimoli02/2023-2024-SURFiN-Foraging-Project.git HEAD:main
