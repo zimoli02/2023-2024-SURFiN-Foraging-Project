@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        tex_file: ['Equation 2.32.tex']
+        tex_file: ['Equation_2.32.tex']
     steps:
     - name: Check out repository
       uses: actions/checkout@v2
