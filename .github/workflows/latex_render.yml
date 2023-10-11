@@ -33,5 +33,5 @@ jobs:
         git config --global user.email 'action@github.com'
         git add "D&K Books/*.pdf" 
         git commit -m "Update rendered PDFs" || echo "No changes to commit"
-        git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/zimoli02/2023-2024-SURFiN-Foraging-Project.git
+        git remote set-url origin https://x-access-token:${LATEX_TOKEN}@github.com/zimoli02/2023-2024-SURFiN-Foraging-Project.git
         git push origin HEAD
