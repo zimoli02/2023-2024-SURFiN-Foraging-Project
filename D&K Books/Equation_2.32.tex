@@ -11,9 +11,9 @@
 
 \maketitle
 
-\section{Regression Lemma}
+\section{Conditional Distribution of Joint Gaussian Variables}
 
-Suppose that \(x\) and \(y\) are jointly normally distributed variables with:
+Suppose that \(x\) and \(y\) are jointly normally distributed random vectors with:
 
 \[
 E
@@ -34,17 +34,17 @@ y
 \end{bmatrix}
 =
 \begin{bmatrix}
-\sigma_{x}^2 & \sigma_{xy}\\
-\sigma_{xy} & \sigma_{y}^2
-\end{bmatrix},
+Cov(x,x) & Cov(x,y)\\
+Cov(y,x) & Cov(y,y)
+\end{bmatrix}
 \]\\
 
 \par\noindent
 Then the \(E\) and \(Var\) of \(x\) given \(y\) would be:
-\[
-E(x|y) = \mu_x + \frac{\sigma_{xy}}{\sigma_{y}^2}(y-\mu_{y})\text{, }\quad
-Var(x|y) = \sigma_{x}^2 - \frac{\sigma_{xy}^2}{\sigma_{y}^2}
-\]
+\begin{align*}
+    E(x|y) &= \mu_x + Cov(x,y)Cov^{-1}(y,y)(y-\mu_{y})\\
+    Var(x|y) &= Cov(x,x) - Cov(x,y)Cov^{-1}(y,y)Cov(y,x)
+\end{align*}
 
 \section{Expectation of Smoothed State \(\hat{\alpha_t}\)}
 
@@ -56,27 +56,28 @@ We also know that when \(Y_n\) is fixed, \(y_1, \cdots, y_t-1\) and \(v_t, \cdot
 \par\noindent
 Therefore, we have:
 
-\begin{align}
+\begin{align*}
     p(\alpha_{t}|Y_{n}) &=  p(\alpha_{t}|Y_{t-1}, v_t, \cdots, v_n)\\
     &= \frac{p(\alpha_{t}, v_t, \cdots, v_n|Y_{t-1})}{p(v_t, \cdots, v_n|Y_{t-1})}\\
     &= p(\alpha_{t}| (v_t, \cdots, v_n | Y_{t-1}))
-\end{align}
+\end{align*}
 
 \par\noindent
 Let \(x = \alpha_{t}\) and \(y = v_t, \cdots, v_n | Y_{t-1} = v_{t-n} \), we have:
 
-\begin{align}
+\begin{align*}
     E(\alpha_{t}|Y_{n}) &= E(\alpha_{t} | (v_t, \cdots, v_n | Y_{t-1}))\\
     &= E(x|y)\\
-    &= \mu_x + \frac{\sigma_{xy}}{\sigma_{y}^2}(y-\mu_{y})\\
-    &= E(\alpha_{t}) + \frac{Cov(\alpha_{t}, v_{t-n})}{\sigma_{v_{t-n}}^2}(v_{t-n}-E[v_{t-n}])\\
+    &= \mu_x + Cov(x,y)Cov^{-1}(y,y)(y-\mu_{y})\\
+    &= E(\alpha_{t}) + (\sum_{j=t}^{n}Cov(\alpha_{t}, v_{j})
+    )Cov^{-1}(v_{t-n},v_{t-n})(v_{t-n}-E[v_{t-n}])\\
     &= a_t + \frac{\sum_{j=t}^{n}Cov(\alpha_{t}, v_{j})}{F_{t-n}}(v_{t-n}-0)\\
     &= a_t + \sum_{j=t}^{n}Cov(\alpha_{t}, v_{j})F_{j}^{-1}v_{j}
-\end{align}
+\end{align*}
 
 \par\noindent
 To calculate \(Cov(\alpha_{t}, v_{j})\), we have:
-\begin{align}
+\begin{align*}
     Cov(\alpha_{t}, v_{j}) &= Cov(x_{t} + a_{t}, v_{j})\\
     &= Cov(x_{t}, v_{j}) \\
     &= Cov(x_{t}, x_{j} + \epsilon_{j})\\
@@ -101,45 +102,46 @@ To calculate \(Cov(\alpha_{t}, v_{j})\), we have:
     P_t & \text{for }j = t\\ 
     P_t\sum_{k=t}^{j-1}L_{k} & \text{for }  j > t
     \end{cases} \label{eq:covariance}\\
-\end{align}
+\end{align*}
 
 \par\noindent
 Let \(r_{t-1} =\frac{1}{P_t}\sum_{j=t}^{n}Cov(\alpha_{t}, v_{j})F_{j}^{-1}v_{j}\), we have:
-\begin{align}
+\begin{align*}
     r_{t-1} &=\frac{v_t}{F_t} + \sum_{j=t+1}^{n}\frac{v_{j}}{F_{j}}\prod_{k=t}^{j-1}L_k\\
     E(\alpha_{t}|Y_{n}) &= a_t + \sum_{j=t}^{n}Cov(\alpha_{t}, v_{j})F_{j}^{-1}v_{j}\\
     &= a_t + P_t r_{t-1}
-\end{align}
+\end{align*}
 
 \par\noindent
 Since \(r_n = 0\), \(\hat{\alpha_t}\) could be derived:
-\begin{align}
+\begin{align*}
     r_{t-1} &= L_tr_t + \frac{v_t}{F_t}\\
     \hat{\alpha_t} &= a_t  + P_tr_{t-1}
-\end{align}
+\end{align*}
 
 \section{Variance of Smoothed State \(V_t\)}
 
 Corresponding to previous assumptions \(x = \alpha_{t}\) and \(y = v_t, \cdots, v_n | Y_{t-1} = v_{t-n} \), we have:
-\begin{align}
+\begin{align*}
     V_t &= Var(\alpha_{t}|Y_{n})\\
     &= Var(\alpha_{t} | (v_t, \cdots, v_n | Y_{t-1}))\\
     &= Var(x|y)\\
-    &= \sigma_{x}^2 - \frac{\sigma_{xy}^2}{\sigma_{y}^2}\\
+    &= Cov(x,x) - Cov(x,y)Cov^{-1}(y,y)Cov(y,x)\\
     &= P_t - \sum_{j=t}^{n}(Cov(\alpha_{t}, v_{j}))^2 F_{j}^{-1}
-\end{align}
+\end{align*}
 
 \par\noindent
-Use Eq.~\ref{eq:covariance}, we have:
-\begin{align}
+Therefore we have:
+\begin{align*}
     V_t &= P_t - \sum_{j=t}^{n}(Cov(\alpha_{t}, v_{j}))^2 F_{j}^{-1}\\
     &= P_t - P_t^2N_{t-1}\\
 \intertext{where} N_{t-1} &= \frac{1}{F_t} + \sum_{j=t+1}^{n}\frac{1}{F_{j}}\prod_{k=t}^{j-1}L_k^2
-\end{align}
+\end{align*}
 \par\noindent
 Similar as before, we have  \(N_n = 0\), therefore we could derive \(V_t\) from \(V_n\):
-\begin{align}
-     N_{t-1} &= L_t^2N_t + \frac{1}{F_t}\\
-     V_{t-1} &= P_t - P_t^2N_{t-1}
-\end{align}
+\begin{align*}
+    N_{t-1} &= L_t^2N_t + \frac{1}{F_t}\\
+    V_{t-1} &= P_t - P_t^2N_{t-1}
+\end{align*}
+
 \end{document}
