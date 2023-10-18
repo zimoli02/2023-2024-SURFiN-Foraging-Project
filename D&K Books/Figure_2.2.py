@@ -3,41 +3,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def ApplyFilter(a1, p1, e, n, y, timepoints):
-    a, p, F = np.zeros(timepoints+1, dtype = np.double), np.zeros(timepoints+1, dtype = np.double), np.zeros(timepoints, dtype = np.double)
-    A, P = np.zeros(timepoints, dtype = np.double), np.zeros(timepoints, dtype = np.double)
+import lds
 
-    a[0], p[0] = a1, p1
-
-    for i in range(0, timepoints):
-        F[i] = p[i] + e
-        K = p[i]/F[i]
-        #filtering
-        A[i] = a[i] + K*(y[i] - a[i])
-        P[i] = K*e
-        #predicting
-        a[i+1] = A[i]
-        p[i+1] = P[i] + n
-    
-    return a[0:-1], p[0:-1],F
-
-def ApplySmoothing(a, p, F, v, e, timepoints):
-    r, N = np.zeros(timepoints, dtype = np.double), np.zeros(timepoints, dtype = np.double)
-    A_, P_ = np.zeros(timepoints, dtype = np.double), np.zeros(timepoints, dtype = np.double)
-
-    for i in range(timepoints-1, 0, -1):
-        r[i-1] = (v[i]/F[i]) + (e/F[i])*r[i]
-        N[i-1] = (1/F[i]) + ((e/F[i])**2)*N[i]
-    r_ = (v[0]/F[0]) + (e/F[0])*r[0]
-    N_ = (1/F[0]) + ((e/F[0])**2)*N[0]
-    
-    A_[0] = a[0] + p[0]*r_
-    P_[0] = p[0] - (p[0]**2)*N_
-    for i in range(1,timepoints):
-        A_[i] = a[i] + p[i]*r[i-1]
-        P_[i] = p[i] - (p[i]**2)*N[i-1]
-    
-    return A_, P_, r, N
 
 def main():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -51,15 +18,15 @@ def main():
     timepoints = len(years)
 
     # Filter data
-    a,p,F = ApplyFilter(a1, p1, e, n, y, timepoints)
-    v = [y[i] - a[i] for i in range(timepoints)]
+    a, p, F, A, P = lds.ApplyFilter(a1, p1, e, n, y)
+    v = [y[i] - a[i] for i in range(len(y))]
 
     # Smooth data
-    A_, P_, r, N = ApplySmoothing(a, p, F, v, e, timepoints)
+    A_, P_, r, N = lds.ApplySmoothing(a, p, F, y, v, e)
     t, end = 0,100
     years_xlabel = [1880, 1900, 1920, 1940, 1960]
-    upper_bound = [A_[i] + 1.65*(P_[i]**0.5) for i in range(timepoints)]
-    lower_bound = [A_[i] - 1.65*(P_[i]**0.5) for i in range(timepoints)]
+    upper_bound = [A_[i] + 1.65*(P_[i]**0.5) for i in range(len(y))]
+    lower_bound = [A_[i] - 1.65*(P_[i]**0.5) for i in range(len(y))]
     
     fig, axs = plt.subplots(2,2, figsize = (20,14))
     axs[0,0].scatter(years, y, color = 'black')
