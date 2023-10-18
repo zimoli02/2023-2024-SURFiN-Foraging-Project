@@ -2,49 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-def ApplyFilter(a1, p1, e, n, y, timepoints):
-    a, p, F = np.zeros(timepoints+1, dtype = np.double), np.zeros(timepoints+1, dtype = np.double), np.zeros(timepoints, dtype = np.double)
-    A, P = np.zeros(timepoints, dtype = np.double), np.zeros(timepoints, dtype = np.double)
-
-    a[0], p[0] = a1, p1
-
-    for i in range(0, timepoints):
-        F[i] = p[i] + e
-        K = p[i]/F[i]
-        #predicting
-        if np.isnan(y[i]): 
-            K = 0
-            A[i] = a[i]
-            P[i] = p[i]
-        else:
-            A[i] = a[i] + K*(y[i] - a[i])
-            P[i] = K*e
-        #predicting
-        a[i+1] = A[i]
-        p[i+1] = P[i] + n
-    
-    return a[0:-1], p[0:-1],F,A,P
-
-def ApplySmoothing(a, p, F, y, v, e, timepoints):
-    r, N = np.zeros(timepoints, dtype = np.double), np.zeros(timepoints, dtype = np.double)
-    A_, P_ = np.zeros(timepoints, dtype = np.double), np.zeros(timepoints, dtype = np.double)
-
-    for i in range(timepoints-1, 0, -1):
-        if np.isnan(y[i]): r[i-1], N[i-1] = r[i], N[i]
-        else:
-            r[i-1] = (v[i]/F[i]) + (e/F[i])*r[i]
-            N[i-1] = (1/F[i]) + ((e/F[i])**2)*N[i]
-    r_ = (v[0]/F[0]) + (e/F[0])*r[0]
-    N_ = (1/F[0]) + ((e/F[0])**2)*N[0]
-    
-    A_[0] = a[0] + p[0]*r_
-    P_[0] = p[0] - (p[0]**2)*N_
-    for i in range(1,timepoints):
-        A_[i] = a[i] + p[i]*r[i-1]
-        P_[i] = p[i] - (p[i]**2)*N[i-1]
-    
-    return A_, P_, r, N
+import lds
 
 def main():
     # Import Data
@@ -65,7 +23,9 @@ def main():
     for i in range(60,80): y[i] = np.nan
 
     # Apply Filtering
-    a,p,F, A, P = ApplyFilter(a1, p1, e, n, y, timepoints)
+    a, p, F, A, P = lds.ApplyFilter(a1, p1, e, n, y)
+    v = [y[i] - a[i] for i in range(len(y))]
+    A_, P_, r, n = lds.ApplySmoothing(a, p, F, y, v, e)
 
 
     # Plotting
