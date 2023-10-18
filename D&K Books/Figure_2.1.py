@@ -2,24 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-def ApplyFilter(a1, p1, e, n, y, timepoints):
-    a, p, F = np.zeros(timepoints+1, dtype = np.double), np.zeros(timepoints+1, dtype = np.double), np.zeros(timepoints, dtype = np.double)
-    A, P = np.zeros(timepoints, dtype = np.double), np.zeros(timepoints, dtype = np.double)
-
-    a[0], p[0] = a1, p1
-
-    for i in range(0, timepoints):
-        F[i] = p[i] + e
-        K = p[i]/F[i]
-        #filtering
-        A[i] = a[i] + K*(y[i] - a[i])
-        P[i] = K*e
-        #predicting
-        a[i+1] = A[i]
-        p[i+1] = P[i] + n
-    
-    return a[0:-1], p[0:-1],F
+import lds
 
 def main():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -33,14 +16,14 @@ def main():
     timepoints = len(years)
 
     # Filter data
-    a,p,F = ApplyFilter(a1, p1, e, n, y, timepoints)
-    v = [y[i] - a[i] for i in range(timepoints)]
+    a, p, F, A, P = lds.ApplyFilter(a1, p1, e, n, y)
+    v = [y[i] - a[i] for i in range(len(y))]
 
     # Plot filtered data
     # Note: here data is displayed from t = 2 to t = n
     years_xlabel = [1880, 1900, 1920, 1940, 1960]
-    upper_bound = [a[i] + 1.65*(p[i]**0.5) for i in range(timepoints)]
-    lower_bound = [a[i] - 1.65*(p[i]**0.5) for i in range(timepoints)]
+    upper_bound = [a[i] + 1.65*(p[i]**0.5) for i in range(len(y))]
+    lower_bound = [a[i] - 1.65*(p[i]**0.5) for i in range(len(y))]
     
     fig, axs = plt.subplots(2,2, figsize = (18,14))
     axs[0,0].scatter(years, y, color = 'black')
