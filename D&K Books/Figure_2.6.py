@@ -2,31 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-def ApplyFilter(a1, p1, e, n, y, timepoints):
-    a, p, F = np.zeros(timepoints+1, dtype = np.double), np.zeros(timepoints+1, dtype = np.double), np.zeros(timepoints, dtype = np.double)
-    A, P = np.zeros(timepoints, dtype = np.double), np.zeros(timepoints, dtype = np.double)
-
-    a[0], p[0] = a1, p1
-
-    for i in range(0, timepoints):
-        F[i] = p[i] + e
-        K = p[i]/F[i]
-        #predicting
-        if np.isnan(y[i]): 
-            K = 0
-            A[i] = a[i]
-            P[i] = p[i]
-        else:
-            A[i] = a[i] + K*(y[i] - a[i])
-            P[i] = K*e
-        #predicting
-        a[i+1] = A[i]
-        p[i+1] = P[i] + n
-    
-    return a[0:-1], p[0:-1],F,A,P
-
-
+import lds
 
 def main():
     # Import Data
@@ -46,10 +22,10 @@ def main():
     for i in range(30): 
         y_ = np.append(y_, np.nan)
         years_ = np.append(years_, years_[-1] + 1)
-    timepoints = len(y_)
+
 
     # Apply Filtering
-    a, p, F, A, P = ApplyFilter(a1, p1, e, n, y_, timepoints)
+    a, p, F, A, P = lds.ApplyFilter(a1, p1, e, n, y_)
     a_ = A
     p_ = [P[i] + e for i in range(len(P))]
 
@@ -59,8 +35,8 @@ def main():
 
     fig, axs = plt.subplots(2,2, figsize = (20,14))
     
-    upper_bound = [A[i] + 0.67*(P[i]**0.5) for i in range(timepoints)]
-    lower_bound = [A[i] - 0.67*(P[i]**0.5) for i in range(timepoints)]
+    upper_bound = [A[i] + 0.67*(P[i]**0.5) for i in range(len(y_))]
+    lower_bound = [A[i] - 0.67*(P[i]**0.5) for i in range(len(y_))]
 
     axs[0,0].scatter(years, y, color = 'black')
     axs[0,0].plot(years_, A, color = 'black', alpha = 0.8)
