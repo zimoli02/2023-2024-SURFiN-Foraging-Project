@@ -15,7 +15,8 @@ def main():
     # Parameter: e = \sigma_{\eta}^2
     L1, E1, grad1 = lds.MaximizeLikelihood(y, paras = dict({'a1':a1, 'p1':p1, 'e': 1, 'n':n}), para = 'e')
     L2, E2, grad2 = lds.MaximizeLikelihood(y, paras = dict({'a1':a1, 'p1':p1, 'e': 25000, 'n':n}), para = 'e')
-    E3, grad3 = np.arange(1,25000), [lds.dLikelihood(y, dict({'a1':a1, 'p1':p1, 'e': i, 'n':n}), para = 'e') for i in E3]
+    E3 = np.arange(1,25000)
+    grad3 = [lds.dLikelihood(y, dict({'a1':a1, 'p1':p1, 'e': i, 'n':n}), para = 'e') for i in E3]
     
     fig, axs = plt.subplots(1,3, figsize = (28, 6))
     axs[0].plot(np.log(E1), L1, color = 'red')
@@ -42,7 +43,8 @@ def main():
     # Parameter: n = \sigma_{\epsilon}^2
     L1, N1, grad1 = lds.MaximizeLikelihood(y, paras = dict({'a1':a1, 'p1':p1, 'e': e, 'n':1}), para = 'n')
     L2, N2, grad2 = lds.MaximizeLikelihood(y, paras = dict({'a1':a1, 'p1':p1, 'e': e, 'n':10000}), para = 'n')
-    N3, grad3 = np.arange(1,40000), [lds.dLikelihood(y, dict({'a1':a1, 'p1':p1, 'e': e, 'n':i}), para = 'n') for i in N3]
+    N3 = np.arange(1,10000)
+    grad3 = [lds.dLikelihood(y, dict({'a1':a1, 'p1':p1, 'e': e, 'n':i}), para = 'n') for i in N3]
     
     fig, axs = plt.subplots(1,3, figsize = (28, 6))
     axs[0].plot(np.log(N1), L1, color = 'red')
