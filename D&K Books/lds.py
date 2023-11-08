@@ -2,6 +2,15 @@ import numpy as np
 import pandas as pd
 import math
 
+def SimulateData(a1, p1, n, e, num):
+    a, y = np.zeros(num+1), np.zeros(num)
+    a[0] = np.random.normal(a1, p1**0.5)
+    
+    for i in range(num):
+        y[i] = a[i] + np.random.normal(0, e**0.5)
+        a[i+1] = a[i] + np.random.normal(0, n**0.5)
+    
+    return y
 
 def ApplyFilter(a1, p1, e, n, y):
     timepoints = len(y)
@@ -48,19 +57,8 @@ def ApplySmoothing(a, p, F, y, v, e):
     return A_, P_, r, N
 
 
-
-
-def LogLikelihood(y, a1, p1, e, n):
-    a, p, F, A, P = ApplyFilter(a1, p1, e, n, y)
-    v = [y[i] - a[i] for i in range(len(y))]
-    
-    L = len(F)*math.log(2*math.pi)
-    for i in range(len(F)): L += math.log(F[i]) + v[i]**2/F[i]
-    
-    return -L/2
-
-
-def Likelihood_de(y, a1, p1, e, n):
+def dLikelihood(y, paras, para = 'e'):
+    a1, p1, e, n = paras['a1'], paras['p1'],paras['e'],paras['n']
     a, p, F, A, P = ApplyFilter(a1, p1, e, n, y)
     v = [y[i] - a[i] for i in range(len(y))]
     
@@ -70,34 +68,47 @@ def Likelihood_de(y, a1, p1, e, n):
     
     dL = (1/(F[0]**2)*(F[0]-v[0]**2)*dF[0]) + 2*F[0]*v[0]*dv[0]
     for i in range(1, len(F)):
-        dF.append((e/F[i-1])**2*dF[i-1]-2*e/F[i-1]+2)
-        dv.append(dv[i-1] - ((1-e/(F[i-1])**2)*dv[i-1] + e*v[i-1]*dF[i-1]/(F[i-1]**2)-v[i-1]/F[i-1]))
+        if para == 'e': 
+            dF.append((e/F[i-1])**2*dF[i-1]-2*e/F[i-1]+2)
+            dv.append(dv[i-1] - ((1-e/(F[i-1])**2)*dv[i-1] + e*v[i-1]*dF[i-1]/(F[i-1]**2)-v[i-1]/F[i-1]))
+        elif para == 'n':
+            dF.append((e/F[i-1])**2*dF[i-1]+1)
+            dv.append(dv[i-1] - ((1-e/F[i-1])*dv[i-1] + e*v[i-1]*dF[i-1]/(F[i-1]**2)))
         dL += 1/(F[i]**2)*((F[i]-v[i]**2)*dF[i] + 2*F[i]*v[i]*dv[i])
-    
+
     return -dL/2
 
+def LogLikelihood(y, paras):
+    a1, p1, e, n = paras['a1'], paras['p1'],paras['e'],paras['n']
+    a, p, F, A, P = ApplyFilter(a1, p1, e, n, y)
+    v = [y[i] - a[i] for i in range(len(y))]
+    
+    L = len(F)*math.log(2*math.pi)
+    for i in range(len(F)): L += math.log(F[i]) + v[i]**2/F[i]
+    
+    return -L/2
 
-def MaximizeLikelihood(y, a1, p1, e, n):
-    L, E, grad = [], [], []
-    
+def MaximizeLikelihood(y, paras, para = 'e'):
+    L, P, grad = [], [], []
+    d = 0.0001
+
     iter = 1
-    L.append(LogLikelihood(y, a1, p1, e, n))
-    E.append(e)
-    grad.append(Likelihood_de(y, a1, p1, e, n))
-    print("iter = "+str(iter), "L = "+str(L[-1]), "E = "+str(E[-1]), "Gradient = "+str(grad[-1]))
-    
     step = 5
     stop = False
     while stop == False:
-        iter += 1
-        e = e + step
-        L.append(LogLikelihood(y, a1, p1, e, n))
-        E.append(e)
-        grad.append(Likelihood_de(y, a1, p1, e, n))
-        print("iter = "+str(iter), "L = "+str(L[-1]), "E = "+str(E[-1]), "Gradient = "+str(grad[-1]))
+        paras[para] += step
+        paras_ = paras.copy()
+        paras_[para] += d
         
-        if abs(grad[-1])<=1e-7: stop = True
-        elif (grad[-1]*grad[-2])<0: step = (E[-1]-E[-2])/2*(grad[-1]/abs(grad[-1]))
+        L.append(LogLikelihood(y, paras))
+        P.append(paras[para])
+        grad.append((LogLikelihood(y, paras_) - LogLikelihood(y, paras))/d)
+        
+        print("iter = "+str(iter), " L = "+str(L[-1]), " Para = "+str(P[-1]), " Gradient = "+str(grad[-1]))
+        iter += 1
+        
+        if abs(grad[-1]) <= 1e-6: stop = True
+        elif len(grad)>=2 and (grad[-1]*grad[-2]) < 0: step = (P[-1]-P[-2])/2*(grad[-1]/abs(grad[-1]))
         else: step = 5*(grad[-1]/abs(grad[-1]))
         
-    return L, E, grad
+    return L, P, grad
