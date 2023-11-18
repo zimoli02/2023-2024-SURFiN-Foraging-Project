@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import math
+import scipy.stats as ss
 
 def SimulateData(a1, p1, n, e, num):
     a, y = np.zeros(num+1), np.zeros(num)
@@ -12,24 +13,32 @@ def SimulateData(a1, p1, n, e, num):
     
     return y
 
-def ApplyFilter(a1, p1, e, n, y):
+def SteadyStateVariance(e,n):
+    q = n/e
+    if q >= 0: return (q + np.sqrt(q**2 + 4*q))*e/2
+    else: return 'no steady state'
+
+def ApplyFilter(a1, p1, e, n, y, steady_state = False):
     timepoints = len(y)
     a, p, F = np.zeros(timepoints+1, dtype = np.double), np.zeros(timepoints+1, dtype = np.double), np.zeros(timepoints, dtype = np.double)
     A, P = np.zeros(timepoints, dtype = np.double), np.zeros(timepoints, dtype = np.double)
-
+    if steady_state:  p_ = SteadyStateVariance(e,n)
+    
     a[0], p[0] = a1, p1
-
     for i in range(0, timepoints):
-        F[i] = p[i] + e
-        K = p[i]/F[i]
-        #predicting
+        if not steady_state:
+            F[i] = p[i] + e
+            K = p[i]/F[i]
+        else:
+            K = p_/(p_+ e)
+
         if np.isnan(y[i]): 
             A[i] = a[i]
             P[i] = p[i]
         else:
             A[i] = a[i] + K*(y[i] - a[i])
             P[i] = K*e
-        #predicting
+
         a[i+1] = A[i]
         p[i+1] = P[i] + n
     
@@ -112,3 +121,35 @@ def MaximizeLikelihood(y, paras, para = 'e'):
         else: step = 5*(grad[-1]/abs(grad[-1]))
         
     return L, P, grad
+
+def DiagnosticCheck(a1, p1, e, n, y, k=10):
+    N = len(y)-1
+    a, p, F, A, P = ApplyFilter(a1, p1, e, n, y)
+    v = [y[i] - a[i] for i in range(len(y))]
+
+    E = np.array([v[i]/np.sqrt(F[i]) for i in range(1,len(y))])
+    m,H,c,Q = np.zeros(4), np.zeros(N), np.zeros(k), np.zeros(k)
+
+    m[0] = np.mean(E) #mean
+    m[1] = np.mean([(E[j]-m[0])**2 for j in range(N)]) #variance
+    m[2] = np.mean([(E[j]-m[0])**3 for j in range(N)])
+    m[3] = np.mean([(E[j]-m[0])**4 for j in range(N)])
+    S, K = m[2]/((np.sqrt(m[1]))**3), m[3]/((m[1])**2) #Skewness and Kurtosis
+    NN = (N+1)*(S**2/6 + (K-3)**2/24)
+
+    H[0] = E[-1]**2 / (E[0] **2)
+    for i in range(1,N):
+        H[i] = (np.sum([E[j]**2 for j in range(N-i, N)]))/(np.sum([E[j]**2 for j in range(i)]))
+
+    for i in range(k):
+        c[i] = np.sum([(E[j] - m[0])*(E[j-i]-m[0]) for j in range (i+1, N)])/((N+1)*m[1])
+        Q[i] = (N+1)*(N+3)*np.sum([c[j]**2/(N-j) for j in range(i)])
+
+    p_S, p_K = ss.norm.sf(S, loc=0, scale=6/(N+2)),ss.norm.sf(K, loc = 3, scale = 24/(N+2))
+    return E, (S,p_S), (K, p_K), NN, H, c, Q
+
+def ZScore(x):
+    m = np.mean(x)
+    std = np.sqrt(np.sum([(x[i] - m)**2 for i in range(len(x))])/(len(x)-1))
+    z = [(x[i]-m)/std for i in range(len(x))]
+    return z
