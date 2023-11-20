@@ -22,16 +22,15 @@ def ApplyFilter(a1, p1, e, n, y, steady_state = False):
     timepoints = len(y)
     a, p, F = np.zeros(timepoints+1, dtype = np.double), np.zeros(timepoints+1, dtype = np.double), np.zeros(timepoints, dtype = np.double)
     A, P = np.zeros(timepoints, dtype = np.double), np.zeros(timepoints, dtype = np.double)
-    if steady_state:  p_ = SteadyStateVariance(e,n)
+    p_ = SteadyStateVariance(e,n)
+    if p_ == 'no steady state': return 'No Steady State'
     
     a[0], p[0] = a1, p1
     for i in range(0, timepoints):
-        if not steady_state:
-            F[i] = p[i] + e
-            K = p[i]/F[i]
-        else:
-            K = p_/(p_+ e)
-
+        F[i] = p[i] + e
+        K = p[i]/F[i]
+        if steady_state:
+            if abs(p[i]-p_)<=0.001: K = p_/(p_+ e)
         if np.isnan(y[i]): 
             A[i] = a[i]
             P[i] = p[i]
@@ -128,28 +127,26 @@ def DiagnosticCheck(a1, p1, e, n, y, k=10):
     v = [y[i] - a[i] for i in range(len(y))]
 
     E = np.array([v[i]/np.sqrt(F[i]) for i in range(1,len(y))])
-    m,H,c,Q = np.zeros(4), np.zeros(N), np.zeros(k), np.zeros(k)
+    m,H,c,Q = np.zeros(4), np.zeros(N), np.zeros(k+1), np.zeros(k+1)
 
     m[0] = np.mean(E) #mean
     m[1] = np.mean([(E[j]-m[0])**2 for j in range(N)]) #variance
     m[2] = np.mean([(E[j]-m[0])**3 for j in range(N)])
     m[3] = np.mean([(E[j]-m[0])**4 for j in range(N)])
-    S, K = m[2]/((np.sqrt(m[1]))**3), m[3]/((m[1])**2) #Skewness and Kurtosis
-    NN = (N+1)*(S**2/6 + (K-3)**2/24)
+    S, K = m[2]/(np.sqrt(m[1]**3)), m[3]/(m[1]**2) #Skewness and Kurtosis
+    NN = N*(S**2/6 + (K-3)**2/24)
 
     H[0] = E[-1]**2 / (E[0] **2)
     for i in range(1,N):
         H[i] = (np.sum([E[j]**2 for j in range(N-i, N)]))/(np.sum([E[j]**2 for j in range(i)]))
 
-    for i in range(k):
-        c[i] = np.sum([(E[j] - m[0])*(E[j-i]-m[0]) for j in range (i+1, N)])/((N+1)*m[1])
-        Q[i] = (N+1)*(N+3)*np.sum([c[j]**2/(N-j) for j in range(i)])
+    for i in range(k+1):
+        c[i] = np.sum([(E[j] - m[0])*(E[j-i]-m[0]) for j in range (i+1, N)])/(N*m[1])
+        Q[i] = N*(N+2)*np.sum([c[j]**2/(N-j-1) for j in range(i)])
 
     p_S, p_K = ss.norm.sf(S, loc=0, scale=6/(N+2)),ss.norm.sf(K, loc = 3, scale = 24/(N+2))
-    return E, (S,p_S), (K, p_K), NN, H, c, Q
+    return E, (S,p_S), (K, p_K), NN, H, c[1:], Q[1:]
 
-def ZScore(x):
-    m = np.mean(x)
-    std = np.sqrt(np.sum([(x[i] - m)**2 for i in range(len(x))])/(len(x)-1))
-    z = [(x[i]-m)/std for i in range(len(x))]
-    return z
+def TheoreticalQuantile(x):
+    (res_o_values, (slope, intercept, r)) = ss.probplot(x, dist="norm")
+    return res_o_values

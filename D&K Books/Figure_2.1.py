@@ -15,12 +15,10 @@ def main():
     n = 1469.1
     timepoints = len(years)
 
-    # Filter data
+    # Filter data: not using steady state
     a, p, F, A, P = lds.ApplyFilter(a1, p1, e, n, y)
     v = [y[i] - a[i] for i in range(len(y))]
 
-    # Plot filtered data
-    # Note: here data is displayed from t = 2 to t = n
     years_xlabel = [1880, 1900, 1920, 1940, 1960]
     upper_bound = [a[i] + 1.65*(p[i]**0.5) for i in range(len(y))]
     lower_bound = [a[i] - 1.65*(p[i]**0.5) for i in range(len(y))]
@@ -52,13 +50,11 @@ def main():
     fig.suptitle("Nile data and output of Kalman filter", y = 0.0, fontsize = 25)
     plt.savefig('Fig_2.1.png')
 
-    # Filter data
+    # Filter data: using steady_state when its difference with Kalman filter variance <= 1e-3 
     a_, p_, F_, A_, P_ = lds.ApplyFilter(a1, p1, e, n, y, steady_state=True)
+    p_steadystate = lds.SteadyStateVariance(e,n)
     v_ = [y[i] - a_[i] for i in range(len(y))]
 
-    # Plot filtered data
-    # Note: here data is displayed from t = 2 to t = n
-    years_xlabel = [1880, 1900, 1920, 1940, 1960]
     upper_bound = [a_[i] + 1.65*(p_[i]**0.5) for i in range(len(y))]
     lower_bound = [a_[i] - 1.65*(p_[i]**0.5) for i in range(len(y))]
     
@@ -74,13 +70,14 @@ def main():
     axs[0,1].set_yticks([7500,10000, 12500, 15000, 17500])
 
     for i in range(1,len(p)):
-        if abs(p[i] - p_[i]) <= 1e-3:
+        if abs(p[i] - p_steadystate) <= 0.001:
             n = i
             break
     axs[0,1].axvline(years[n], color = 'blue',linewidth = 1, linestyle = ':')
 
     dA = [np.sqrt((A[i] - A_[i])**2) for i in range(len(A))]
-    axs[0,2].plot(years[i:], dA[i:], color = 'black')
+    axs[0,2].plot(years[1:], dA[1:], color = 'black')
+    axs[0,2].set_ylabel("Mean-Squared Error")
 
 
     zeroline = np.zeros(timepoints)
@@ -98,8 +95,9 @@ def main():
             axs[i,j].spines['right'].set_visible(False)
             axs[i,j].spines['top'].set_visible(False)
             axs[i,j].set_xticks(years_xlabel)
+    axs[1,2].set_xticks([])
     
-    fig.suptitle("Nile data and output of Kalman filter", y = 0.0, fontsize = 25)
+    fig.suptitle("Nile data and output of Mixed Steady-State Kalman filter", y = 0.0, fontsize = 25)
     plt.savefig('Fig_2.1_SteadyState.png')
     
 if __name__ == "__main__":
