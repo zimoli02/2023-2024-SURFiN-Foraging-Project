@@ -43,7 +43,7 @@ class Cluster():
             axs.scatter(self.center[j][0], self.center[j][1], color = self.colors[j], marker = 'x', s = 100)
         axs.spines['top'].set_visible(False)
         axs.spines['right'].set_visible(False)
-        plt.show()
+        plt.savefig('KMeans.png')
     
     def Plot_J(self, J_):
         fig, axs = plt.subplots(1,1,figsize = (7,7))
@@ -52,13 +52,13 @@ class Cluster():
         axs.spines['right'].set_visible(False)
         axs.set_xlabel('Iteration', fontsize = 14)
         axs.set_ylabel('J', fontsize = 14)
-        plt.show()
+        plt.savefig('KMeansJ.png')
     
     def Run(self):
         J_ = []
         self.DistributeData()
         self.DistortionMeasure()
-        self.Plot_Data()
+        #self.Plot_Data()
         J_.append(self.J)
         for i in range(self.iter):
             self.UpdateCenter()
