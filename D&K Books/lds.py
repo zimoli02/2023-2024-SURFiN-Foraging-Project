@@ -13,6 +13,30 @@ def SimulateData(a1, p1, n, e, num):
     
     return y
 
+
+def SimulateData_Poisson(m0, v0, n, num):
+    x, y = np.zeros(num+1), np.zeros(num)
+    x[0] = np.random.normal(m0, v0**0.5)
+
+    for i in range(num):
+        y[i] = np.random.poisson(np.exp(x[i]))
+        x[i+1] = x[i] + np.random.normal(0, n**0.5)
+
+    return y
+
+def SimulateData_CorrelateNoise(a1, p1, n, e, w, num):
+    a, E, y = np.zeros(num+1), np.zeros(num+1), np.zeros(num)
+    a[0] = np.random.normal(a1, p1**0.5)
+    E[0] = e
+    
+    for i in range(num):
+        y[i] = a[i] + E[i]
+        a[i+1] = a[i] + np.random.normal(0, n**0.5)
+        E[i+1] = E[i] + np.random.normal(0, w**0.5)
+    
+    return y, E[:-2]
+
+
 def SteadyStateVariance(e,n):
     q = n/e
     if q >= 0: return (q + np.sqrt(q**2 + 4*q))*e/2
