@@ -59,7 +59,7 @@ def main():
             axs[i,j].spines['top'].set_visible(False)
             axs[i,j].set_xticks(years_xlabel)
     fig.suptitle("Nile data and output of forecasting", y = 0.0, fontsize = 25)
-    plt.show()
+    plt.savefig('Fig_2.6.png')
 
 
 if __name__ == "__main__":

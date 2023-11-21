@@ -54,7 +54,7 @@ def main():
             axs[i,j].spines['top'].set_visible(False)
             axs[i,j].set_xticks(years_xlabel)
     fig.suptitle("Filtering and smoothing output when observations are missing", y = 0.0, fontsize = 25)
-    plt.show()
+    plt.savefig('Fig_2.5.png')
 
 
 if __name__ == "__main__":

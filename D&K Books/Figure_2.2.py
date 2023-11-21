@@ -54,7 +54,7 @@ def main():
             axs[i,j].set_xticks(years_xlabel)
     
     fig.suptitle("Nile data and output of state smoothing recursion", y = 0.0)
-    plt.show()
+    plt.savefig('Fig_2.2.png')
 
 if __name__ == "__main__":
     main()
