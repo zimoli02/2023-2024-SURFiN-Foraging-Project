@@ -58,7 +58,9 @@ $Var[\eta_t]=Var[\eta_{t-1}]+Var[\omega_t]=Var[\eta_0] + \sum_{i=1}^tVar[\omega_
 
 The observation noises are correlated:  
 $Cov[\eta_n, \eta_m]=Cov[\sum_{i=1}^n\omega_i, \sum_{i=1}^m\omega_i]$  
+
 Because each $\omega_i$ and $\omega_j$ is independent:  
 $Cov[\omega_i,\omega_j]=E[(\omega_i-E[\omega_i])(\omega_j - E[\omega_j])]=E[\omega_i\omega_j]=E[\omega_i]E[\omega_j]=0$  
+
 Hence:  
 $Cov[\eta_n, \eta_m]=Cov[\sum_{i=1}^n\omega_i, \sum_{i=1}^m\omega_i]=min(n,m)*\sigma^2_\omega$
