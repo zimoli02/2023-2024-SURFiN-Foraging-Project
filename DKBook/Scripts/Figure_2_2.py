@@ -2,11 +2,19 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import sys
+from pathlib import Path
 
+current_dir = Path(__file__).resolve().parent
+parent_dir = current_dir.parent.parent
+sys.path.append(str(parent_dir))
 import lds
 
 
 def main():
+    current_dir = Path(__file__).resolve().parent
+    figures_dir = current_dir.parent / 'Figures'
+    
     current_dir = os.path.dirname(os.path.abspath(__file__))
     data = pd.read_csv(os.path.join(current_dir,'Niles.csv'))
     years = data['years'].to_numpy()
@@ -54,7 +62,7 @@ def main():
             axs[i,j].set_xticks(years_xlabel)
     
     fig.suptitle("Nile data and output of state smoothing recursion", y = 0.0)
-    plt.savefig('Fig_2.2.png')
+    plt.savefig(figures_dir / 'Fig_2_2.png')
 
 if __name__ == "__main__":
     main()

@@ -12,6 +12,7 @@ class Cluster():
         self.R = np.zeros((self.N, k))
         self.distance = np.zeros((self.N, k))
         self.J = 1e10
+        self.J_ = []
         self.colors = colors
         self.iter = iter
 
@@ -34,8 +35,7 @@ class Cluster():
             r_nk = self.R.T[i]
             self.center[i] = (r_nk@self.data)/np.sum(r_nk)
     
-    def Plot_Data(self):
-        fig, axs = plt.subplots(1,1,figsize = (7,7))
+    def Plot_Data(self, axs):
         for i in range(self.N):
             j = np.argmax(self.R[i])
             axs.scatter(self.data[i][0], self.data[i][1], color = self.colors[j], marker = 'o', s = 40)
@@ -43,27 +43,21 @@ class Cluster():
             axs.scatter(self.center[j][0], self.center[j][1], color = self.colors[j], marker = 'x', s = 100)
         axs.spines['top'].set_visible(False)
         axs.spines['right'].set_visible(False)
-        plt.savefig('KMeans.png')
-    
-    def Plot_J(self, J_):
-        fig, axs = plt.subplots(1,1,figsize = (7,7))
-        axs.plot(np.arange(len(J_)), J_)
-        axs.spines['top'].set_visible(False)
-        axs.spines['right'].set_visible(False)
-        axs.set_xlabel('Iteration', fontsize = 14)
-        axs.set_ylabel('J', fontsize = 14)
-        plt.savefig('KMeansJ.png')
-    
-    def Run(self):
-        J_ = []
+        return axs
+
+    def Initialise(self):
         self.DistributeData()
         self.DistortionMeasure()
-        #self.Plot_Data()
-        J_.append(self.J)
+        self.J_.append(self.J)
+
+    def Iterate(self):
+        self.UpdateCenter()
+        self.DistributeData()
+        self.DistortionMeasure()
+        self.J_.append(self.J)
+    
+    def Run(self):
+        self.Initialise()
         for i in range(self.iter):
-            self.UpdateCenter()
-            self.DistributeData()
-            self.DistortionMeasure()
-            self.Plot_Data()
-            J_.append(self.J)
-        self.Plot_J(J_)
+            self.Iterate()
+

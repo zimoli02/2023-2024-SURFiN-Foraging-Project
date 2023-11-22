@@ -2,9 +2,19 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import sys
+from pathlib import Path
+
+current_dir = Path(__file__).resolve().parent
+parent_dir = current_dir.parent.parent
+sys.path.append(str(parent_dir))
 import lds
 
+
 def main():
+    current_dir = Path(__file__).resolve().parent
+    figures_dir = current_dir.parent / 'Figures'
+
     a1, p1 = 1, 0
     e, w = 15000, 100
     n = 1500
@@ -21,7 +31,7 @@ def main():
         axs[1].plot(E, color = 'blue', alpha = 0.1)
         axs[1].set_ylabel("Observation Noise")
 
-    plt.savefig('CorrelatedNoise.png')
+    plt.savefig(figures_dir / 'CorrelatedNoise.png')
 
 
 

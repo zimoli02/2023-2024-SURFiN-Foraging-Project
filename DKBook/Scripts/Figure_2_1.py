@@ -2,9 +2,18 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import sys
+from pathlib import Path
+
+current_dir = Path(__file__).resolve().parent
+parent_dir = current_dir.parent.parent
+sys.path.append(str(parent_dir))
 import lds
 
 def main():
+    current_dir = Path(__file__).resolve().parent
+    figures_dir = current_dir.parent / 'Figures'
+    
     current_dir = os.path.dirname(os.path.abspath(__file__))
     data = pd.read_csv(os.path.join(current_dir,'Niles.csv'))
     years = data['years'].to_numpy()
@@ -48,7 +57,7 @@ def main():
             axs[i,j].set_xticks(years_xlabel)
     
     fig.suptitle("Nile data and output of Kalman filter", y = 0.0, fontsize = 25)
-    plt.savefig('Fig_2.1.png')
+    plt.savefig(figures_dir / 'Fig_2_1.png')
 
     # Filter data: using steady_state when its difference with Kalman filter variance <= 1e-3 
     a_, p_, F_, A_, P_ = lds.ApplyFilter(a1, p1, e, n, y, steady_state=True)
@@ -98,7 +107,7 @@ def main():
     axs[1,2].set_xticks([])
     
     fig.suptitle("Nile data and output of Mixed Steady-State Kalman filter", y = 0.0, fontsize = 25)
-    plt.savefig('Fig_2.1_SteadyState.png')
+    plt.savefig(figures_dir / 'Fig_2_1_SteadyState.png')
     
 if __name__ == "__main__":
     main()

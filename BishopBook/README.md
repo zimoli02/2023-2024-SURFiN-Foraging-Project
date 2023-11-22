@@ -2,10 +2,8 @@
 ## Chapter 9: Expectation Maximization
 ### K-means Cluster
 
-![KMeansCluster](KMeans.png)  
-*Clustering randomly generated data into 5 groups.*
+![KMeansCluster](/BishopBook/Figures/KMeans.png)  
+*Clustering randomly generated data into 5 groups and the cost function of clustering.*
 
-![KMeansClusterCost](KMeansJ.png)  
-*Cost function of clustering.*
 
-Code for above two figures can be find [here](KMeansCluster.py).
+Code for above two figures can be find [here](/BishopBook/Scripts/KMeansCluster.py).

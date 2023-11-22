@@ -2,9 +2,19 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import sys
+from pathlib import Path
+
+current_dir = Path(__file__).resolve().parent
+parent_dir = current_dir.parent.parent
+sys.path.append(str(parent_dir))
 import lds
 
+
 def main():
+    current_dir = Path(__file__).resolve().parent
+    figures_dir = current_dir.parent / 'Figures'
+    
     current_dir = os.path.dirname(os.path.abspath(__file__))
     data = pd.read_csv(os.path.join(current_dir,'Niles.csv'))
     years = data['years'].to_numpy()
@@ -55,7 +65,7 @@ def main():
             axs[i,j].spines['top'].set_visible(False)
     
     fig.suptitle("Nile data and output of Kalman filter", y = 0.0, fontsize = 25)
-    plt.savefig('Fig_2.7.png')
+    plt.savefig(figures_dir/'Fig_2_7.png')
     
     print('S = ', S, ', K = ', K, ', N = ', NN, ', H(33) = ', H[32], ', Q(9) = ', Q[8])
     print('p value_S: ', p_S, ', p value_K: ',p_K)
