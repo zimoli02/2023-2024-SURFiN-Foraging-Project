@@ -32,7 +32,7 @@ Code for the figure can be found [here](/DKBook/Scripts/Figure_2_6.py)
 Code for the figure can be found [here](/DKBook/Scripts/Figure_2_7.py)
 
 If the observation is not linearly related to the state but belongs to a Poisson distribution $Poisson(\lambda = exp(x_n))$, its fitness with the Kalman filter can be assessed by:  
-![Figure2.7_Poisson](/DKBook/Figures/Fig_2_7_PoissonData.png)   
+![Figure2.7_Poisson](/DKBook/Figures/Fig_2_7_PoissonData.png)  
 Code for the figure can be found [here](/DKBook/Scripts/Figure_2_7_Poisson.py)
 
 where:   
