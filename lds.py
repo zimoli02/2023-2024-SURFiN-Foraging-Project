@@ -47,14 +47,19 @@ def ApplyFilter(a1, p1, e, n, y, steady_state = False):
     a, p, F = np.zeros(timepoints+1, dtype = np.double), np.zeros(timepoints+1, dtype = np.double), np.zeros(timepoints, dtype = np.double)
     A, P = np.zeros(timepoints, dtype = np.double), np.zeros(timepoints, dtype = np.double)
     p_ = SteadyStateVariance(e,n)
+    K_ = p_/(p_+ e)
     if p_ == 'no steady state': return 'No Steady State'
     
     a[0], p[0] = a1, p1
+    flag = False
     for i in range(0, timepoints):
         F[i] = p[i] + e
-        K = p[i]/F[i]
-        if steady_state:
-            if abs(p[i]-p_)<=0.001: K = p_/(p_+ e)
+        if flag == False:
+            K = p[i]/F[i]
+            if steady_state and abs(p[i]-p_)<=1e-3: flag = True
+        else:
+            K = K_
+
         if np.isnan(y[i]): 
             A[i] = a[i]
             P[i] = p[i]
@@ -168,8 +173,11 @@ def DiagnosticCheck(a1, p1, e, n, y, k=10):
         c[i] = np.sum([(E[j] - m[0])*(E[j-i]-m[0]) for j in range (i+1, N)])/(N*m[1])
         Q[i] = N*(N+2)*np.sum([c[j]**2/(N-j-1) for j in range(i)])
 
-    p_S, p_K = ss.norm.sf(S, loc=0, scale=6/(N+2)),ss.norm.sf(K, loc = 3, scale = 24/(N+2))
-    return E, (S,p_S), (K, p_K), NN, H, c[1:], Q[1:]
+    p_S, p_K = ss.norm.sf(S, loc=0, scale=(6/N)**0.5),ss.norm.sf(K, loc = 3, scale = (24/N)*0.05)
+    p_NN = ss.chi2.sf(NN, 2)
+    p_H = [ss.f.sf(H[i], i+1, i+1) for i in range(len(H))]
+    p_Q = [ss.chi2.sf(q, 2) for q in Q]
+    return E, (S,p_S), (K, p_K), (NN, p_NN), (H, p_H), c[1:], (Q[1:],p_Q[1:])
 
 def TheoreticalQuantile(x):
     (res_o_values, (slope, intercept, r)) = ss.probplot(x, dist="norm")

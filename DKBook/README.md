@@ -31,13 +31,23 @@ Code for the figure can be found [here](/DKBook/Scripts/Figure_2_6.py)
 *Figure 2.7: Diagnostic plots for standardised prediction errors: (i) standardised residual; (ii) histogram plus estimated density; (iii) ordered residuals; (iv) correlogram.*  
 Code for the figure can be found [here](/DKBook/Scripts/Figure_2_7.py)
 
+where:  
+$S =  -0.0312, \quad p_S=0.5504$  
+$K =  3.0866,\quad p_K=0.0$  
+$N =  0.0470, \quad p_N=0.9768$  
+$H(33) =  0.5945, \quad p_H=0.9298$  
+$Q(9) =  109.3016, \quad p_Q=0.0$  
+
 If the observation is not linearly related to the state but belongs to a Poisson distribution $Poisson(\lambda = exp(x_n))$, its fitness with the Kalman filter can be assessed by:  
 ![Figure2.7_Poisson](/DKBook/Figures/Fig_2_7_PoissonData.png)  
 Code for the figure can be found [here](/DKBook/Scripts/Figure_2_7_Poisson.py)
 
 where:   
-$S =  2.55, K =  15.39, N =  739.53, H(33) =  0.08, Q(9) =  45.91$  
-$p_S=  0.0 ,  p_K=0.0 $
+$S =  0.7554, \quad p_S=0.0011$  
+$K =  5.1667,\quad p_K=0.0$  
+$N =  28.7799, \quad p_N=0.0$  
+$H(33) =  6.4992, \quad p_H=0.0$  
+$Q(9) =  127.5094, \quad p_Q=0.0$  
 
 
 If the observation noise is acculumated with time, i.e.:  
@@ -49,7 +59,14 @@ Its fitness with the Kalman filter can be assessed by:
 ![Figure2.7_Noise](/DKBook/Figures/Fig_2_7_CorrelateNoise.png)   
 Code for the figure can be found [here](/DKBook/Scripts/Figure_2_7_Noise.py)
 
-Then, the simulated data and observation noise for 100 realizations would be:  
+where:   
+$S =  0.4228, \quad p_S=0.043$  
+$K =  2.9253,\quad p_K=1.0$  
+$N =  2.9720, \quad p_N=0.2263$  
+$H(33) =  0.9917, \quad p_H=0.5095$  
+$Q(9) =  193.6893, \quad p_Q=0.0$  
+
+The simulated data and observation noise for 100 realizations are:  
 ![CorrelateNoiseSimulation](/DKBook/Figures/CorrelatedNoise.png)  
 Code for the figure can be found [here](/DKBook/Scripts/CorrelatedNoise.py)
 

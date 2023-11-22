@@ -28,7 +28,7 @@ def main():
     # Filter data
     a, p, F, A, P = lds.ApplyFilter(a1, p1, e, n, y)
     v = [y[i] - a[i] for i in range(len(y))]
-    E, (S,p_S), (K,p_K), NN, H, c, Q = lds.DiagnosticCheck(a1, p1, e, n, y)
+    E, (S,p_S), (K,p_K), (NN, p_NN), (H, p_H), c, (Q,p_Q) = lds.DiagnosticCheck(a1, p1, e, n, y)
 
 
     years_xlabel = [1880, 1900, 1920, 1940, 1960]
@@ -67,9 +67,12 @@ def main():
     
     fig.suptitle("Nile data and output of Kalman filter", y = 0.0, fontsize = 25)
     plt.savefig(figures_dir / 'Fig_2_7_CorrelateNoise.png')
-    
-    print('S = ', S, ', K = ', K, ', N = ', NN, ', H(33) = ', H[32], ', Q(9) = ', Q[8])
-    print('p value_S: ', p_S, ', p value_K: ',p_K)
+
+    print('S = ', S, ' p value_S = ', round(p_S,4))
+    print('K = ', K, ' p value_K = ', round(p_K,4))
+    print('N = ', NN, ' p value_N = ', round(p_NN,4))
+    print('H(33) = ', H[32], ' p value_H(33) = ', round(p_H[32],4))
+    print('Q(9) = ', Q[8], ' p value_Q(9) = ', round(p_Q[8],4))
 
     
 if __name__ == "__main__":
