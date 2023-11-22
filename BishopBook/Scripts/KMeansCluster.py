@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
 import sys
 from pathlib import Path
 
@@ -13,9 +14,12 @@ import EM
 def main():
   current_dir = Path(__file__).resolve().parent
   figures_dir = current_dir.parent / 'Figures'
-  data = np.random.uniform(-1, 1, (100, 2))
 
-  kmeans = EM.Cluster(data, colors = ['red', 'blue', 'green', 'pink', 'yellow'], k=5)
+  current_dir = os.path.dirname(os.path.abspath(__file__))
+  OldFaithful = pd.read_csv(os.path.join(current_dir,'old_faithful.csv'))
+  data = np.array([[i,j] for i, j in zip (OldFaithful['eruptions'].to_numpy(), OldFaithful['waiting'].to_numpy())])
+
+  kmeans = EM.Cluster(data, colors = ['red', 'blue'], k=2)
   kmeans.Run()
 
   fig, axs = plt.subplots(2,1,figsize = (7, 16))
