@@ -5,11 +5,10 @@ import matplotlib.pyplot as plt
 import sys
 from pathlib import Path
 
-current_dir = Path(__file__).resolve().parent
-parent_dir = current_dir.parent.parent
-sys.path.append(str(parent_dir))
-import lds
-
+script_dir = os.path.dirname(__file__)
+parent_dir = os.path.abspath(os.path.join(script_dir, os.pardir, os.pardir))
+sys.path.append(parent_dir)
+import Scripts.lds as lds
 
 def main():
     current_dir = Path(__file__).resolve().parent
