@@ -6,7 +6,7 @@ import math
 script_dir = os.path.dirname(__file__)
 parent_dir = os.path.abspath(os.path.join(script_dir, os.pardir, os.pardir))
 sys.path.append(parent_dir)
-import Scripts.lds as lds
+import Functions.lds as lds
 
 def main():
     a1, p1 = 0, 1e3

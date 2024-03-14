@@ -8,7 +8,7 @@ from pathlib import Path
 script_dir = os.path.dirname(__file__)
 parent_dir = os.path.abspath(os.path.join(script_dir, os.pardir, os.pardir))
 sys.path.append(parent_dir)
-import Scripts.lds as lds
+import Functions.lds as lds
 
 def main():
     current_dir = Path(__file__).resolve().parent

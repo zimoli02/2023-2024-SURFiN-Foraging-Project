@@ -8,6 +8,13 @@ from typing import Union
 import os
 from dotmap import DotMap
 
+import sys
+from pathlib import Path
+
+current_script_path = Path(__file__).resolve()
+parent_dir = current_script_path.parent.parent
+sys.path.insert(0, str(parent_dir))
+
 import aeon
 from aeon.schema.dataset import exp02
 
@@ -221,3 +228,6 @@ def LDSParameters_Learned(y, dt, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, 
     R = np.diag(optim_res_learned["estimates"]["sqrt_diag_R"].numpy()**2)
 
     return sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value[0], B, Q, m0, V0, Z, R
+
+
+

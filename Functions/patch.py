@@ -1,5 +1,4 @@
 import cv2
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -10,6 +9,13 @@ import scipy
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
+
+import sys
+from pathlib import Path
+
+current_script_path = Path(__file__).resolve()
+parent_dir = current_script_path.parent.parent
+sys.path.insert(0, str(parent_dir))
 
 import aeon
 import aeon.io.api as api

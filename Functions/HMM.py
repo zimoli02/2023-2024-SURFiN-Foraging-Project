@@ -2,6 +2,13 @@ import autograd.numpy as np
 import autograd.numpy.random as npr
 npr.seed(0)
 
+import sys
+from pathlib import Path
+
+current_script_path = Path(__file__).resolve()
+parent_dir = current_script_path.parent.parent
+sys.path.insert(0, str(parent_dir))
+
 import SSM.ssm as ssm
 from SSM.ssm.util import find_permutation
 from SSM.ssm.plots import gradient_cmap, white_to_color_cmap
@@ -28,6 +35,10 @@ def PlotLLS(hmm_lls):
 
 
 def PlotStates(hmm_z, mouse_pos, N):
+    color_names = ["blue","red","yellow", "green","brown","purple","orange", "black"]
+    colors = sns.xkcd_palette(color_names[0:N])
+    cmap = gradient_cmap(colors)
+
     times = pd.to_datetime(mouse_pos.index)
     numerical_times = (times - times[0]).total_seconds().values
     states_array = hmm_z.reshape(1, -1)
@@ -57,6 +68,8 @@ def PlotTransition(transition_mat):
     sns.heatmap(transition_mat, cmap='YlGnBu', ax = axs, square = 'True', cbar = False, annot=annot_array)
     axs.set_title("Learned Transition Matrix")
     plt.show()  
+
+
 
 def FitHMM(data, num_states, n_iters = 50):
     obs_dim = len(data[0])
