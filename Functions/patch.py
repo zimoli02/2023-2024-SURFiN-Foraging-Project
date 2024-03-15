@@ -49,34 +49,6 @@ def SeparateDF(df, freq = '3H'):
     
     return dfs
 
-def FixNan(mouse_pos, duration = 3):
-    df = mouse_pos.copy()
-    nan_blocks = df['x'].isna()
-    for group, data in df[nan_blocks].groupby((nan_blocks != nan_blocks.shift()).cumsum()):
-        duration = data.index[-1] - data.index[0]
-        if duration.total_seconds() >= duration:
-            latest_valid_index = df.loc[:data.index[0], 'x'].last_valid_index()
-            if latest_valid_index is not None:
-                latest_valid_values = df.loc[latest_valid_index, ['x', 'y']].values
-                df.loc[data.index, ['x', 'y']] = np.tile(latest_valid_values, (len(data.index), 1))
-    return df
-
-def AddKinematics(title, mouse_pos):
-    smoothRes = np.load(title+'smoothRes.npz')
-    mouse_pos['smoothed_position_x'] = pd.Series(smoothRes['xnN'][0][0], index=mouse_pos.index)
-    mouse_pos['smoothed_position_y'] = pd.Series(smoothRes['xnN'][3][0], index=mouse_pos.index)
-    mouse_pos['smoothed_velocity_x'] = pd.Series(smoothRes['xnN'][1][0], index=mouse_pos.index)
-    mouse_pos['smoothed_velocity_y'] = pd.Series(smoothRes['xnN'][4][0], index=mouse_pos.index)
-    mouse_pos['smoothed_acceleration_x'] = pd.Series(smoothRes['xnN'][2][0], index=mouse_pos.index)
-    mouse_pos['smoothed_acceleration_y'] = pd.Series(smoothRes['xnN'][5][0], index=mouse_pos.index)
-
-    x_vel, y_vel = mouse_pos['smoothed_velocity_x'], mouse_pos['smoothed_velocity_y']
-    vel = np.sqrt(x_vel**2 + y_vel**2)
-    mouse_pos['smoothed_speed'] = pd.Series(vel)
-        
-    x_acc, y_acc = mouse_pos['smoothed_acceleration_x'], mouse_pos['smoothed_acceleration_y']
-    acc = np.sqrt(x_acc**2 + y_acc**2)
-    mouse_pos['smoothed_acceleration'] = pd.Series(acc)
 
 def AddWeight(mouse_pos, weight):
     mouse_pos.index = pd.to_datetime(mouse_pos.index)
@@ -559,17 +531,3 @@ def ComparePrediction(y1, y1_predicted, y2, y2_predicted):
     
     
     
-def DeleteRows(mouse_pos, row = 5):
-    mouse_pos_reset = mouse_pos.reset_index()
-
-
-    grouping_var = mouse_pos_reset.groupby(mouse_pos_reset.index // row).ngroup()
-    agg_dict = {col: 'mean' for col in mouse_pos_reset.columns if col != 'time'}
-    agg_dict['time'] = 'last'
-
-    mouse_pos_grouped = mouse_pos_reset.groupby(grouping_var).agg(agg_dict)
-
-    mouse_pos_grouped.set_index('time', inplace=True)
-    mouse_pos_grouped.index.name = None
-    
-    return mouse_pos_grouped

@@ -62,12 +62,12 @@ def PlotStates(hmm_z, mouse_pos, N):
     plt.show()
 
 
-def PlotTransition(transition_mat):
+def PlotTransition(transition_mat, title):
     annot_array = np.array([[round(item, 2) for item in row] for row in transition_mat])
     fig, axs = plt.subplots(1,1, figsize=(4, 4))
     sns.heatmap(transition_mat, cmap='YlGnBu', ax = axs, square = 'True', cbar = False, annot=annot_array)
-    axs.set_title("Learned Transition Matrix")
-    plt.show()  
+    axs.set_title("Learned Transition Matrix") 
+    plt.savefig(title)
 
 
 
@@ -80,3 +80,20 @@ def FitHMM(data, num_states, n_iters = 50):
     transition_mat = hmm.transitions.transition_matrix
     
     return hmm, states, transition_mat, lls
+
+
+
+def DeleteRows(mouse_pos, row = 5):
+    mouse_pos_reset = mouse_pos.reset_index()
+
+
+    grouping_var = mouse_pos_reset.groupby(mouse_pos_reset.index // row).ngroup()
+    agg_dict = {col: 'mean' for col in mouse_pos_reset.columns if col != 'time'}
+    agg_dict['time'] = 'last'
+
+    mouse_pos_grouped = mouse_pos_reset.groupby(grouping_var).agg(agg_dict)
+
+    mouse_pos_grouped.set_index('time', inplace=True)
+    mouse_pos_grouped.index.name = None
+    
+    return mouse_pos_grouped

@@ -18,18 +18,47 @@ sys.path.insert(0, str(parent_dir))
 import aeon
 from aeon.schema.dataset import exp02
 
-def FixNan(mouse_pos):
+
+def NestError(last_positions, next_positions):
+    last_x, last_y = last_positions[0], last_positions[1]
+    next_x, next_y = next_positions[0], next_positions[1]
+    
+    if last_x <= 250 and next_x <= 250: return True
+    else: return False
+
+def WallError(last_positions, next_positions):
+    last_x, last_y = last_positions[0], last_positions[1]
+    next_x, next_y = next_positions[0], next_positions[1]
+    
+    if abs(last_x - next_x) <= 5 and abs(last_y - next_y) <= 5 : return True
+    else: return False
+
+def FixNan(mouse_pos, interval = 3):
+    # Long 
     df = mouse_pos.copy()
     nan_blocks = df['x'].isna()
     for group, data in df[nan_blocks].groupby((nan_blocks != nan_blocks.shift()).cumsum()):
         duration = data.index[-1] - data.index[0]
-        if duration.total_seconds() >= 3:
+        if duration.total_seconds() >= interval:
             latest_valid_index = df.loc[:data.index[0], 'x'].last_valid_index()
-            if latest_valid_index is not None:
-                latest_valid_values = df.loc[latest_valid_index, ['x', 'y']].values
+            latest_valid_values = df.loc[latest_valid_index, ['x', 'y']].values
+            
+            next_valid_index = df.loc[data.index[-1] + pd.Timedelta('0.021S'):].first_valid_index()
+            next_valid_values = df.loc[next_valid_index, ['x', 'y']].values
+            
+            if NestError(latest_valid_values,next_valid_values):
+                df.loc[data.index, ['x', 'y']] = np.tile(latest_valid_values, (len(data.index), 1))
+            elif WallError(latest_valid_values,next_valid_values):
                 df.loc[data.index, ['x', 'y']] = np.tile(latest_valid_values, (len(data.index), 1))
     return df
 
+def FixNestError(mouse_pos, nest_upper = 575, nest_lower = 475):
+    df = mouse_pos.copy()
+    nest_blocks = df['x'] <= 250
+    for group, data in df[nest_blocks].groupby((nest_blocks != nest_blocks.shift()).cumsum()):
+        df.loc[(df.index.isin(data.index)) & (df['y'] > nest_upper), 'y'] = nest_upper
+        df.loc[(df.index.isin(data.index)) & (df['y'] < nest_lower), 'y'] = nest_lower
+        
 def GetExperimentTimes(
     root: Union[str, os.PathLike], start_time: pd.Timestamp, end_time: pd.Timestamp
 ) -> DotMap:
@@ -122,13 +151,11 @@ def ExcludeMaintenanceData(
 
 def ProcessRawData(mouse_pos, root, start, end):
     temp_df = mouse_pos.dropna(subset=['x', 'y'])
-    first_valid_index = temp_df.index[0]
-    last_valid_index = temp_df.index[-1]
+    first_valid_index, last_valid_index = temp_df.index[0], temp_df.index[-1]
     mouse_pos = mouse_pos.loc[first_valid_index:last_valid_index]
     
     mouse_pos = FixNan(mouse_pos)
-    experiment_times = GetExperimentTimes(root, start, end)
-    mouse_pos = ExcludeMaintenanceData(mouse_pos, experiment_times)
+    mouse_pos = ExcludeMaintenanceData(mouse_pos, GetExperimentTimes(root, start, end))
     
     return mouse_pos
     
@@ -230,4 +257,35 @@ def LDSParameters_Learned(y, dt, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, 
     return sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value[0], B, Q, m0, V0, Z, R
 
 
+def AddKinematics(title, mouse_pos):
+    smoothRes = np.load('../Data/ProcessedMouseKinematics/' + title+'smoothRes.npz')
+    mouse_pos['smoothed_position_x'] = pd.Series(smoothRes['xnN'][0][0], index=mouse_pos.index)
+    mouse_pos['smoothed_position_y'] = pd.Series(smoothRes['xnN'][3][0], index=mouse_pos.index)
+    mouse_pos['smoothed_velocity_x'] = pd.Series(smoothRes['xnN'][1][0], index=mouse_pos.index)
+    mouse_pos['smoothed_velocity_y'] = pd.Series(smoothRes['xnN'][4][0], index=mouse_pos.index)
+    mouse_pos['smoothed_acceleration_x'] = pd.Series(smoothRes['xnN'][2][0], index=mouse_pos.index)
+    mouse_pos['smoothed_acceleration_y'] = pd.Series(smoothRes['xnN'][5][0], index=mouse_pos.index)
 
+    x_vel, y_vel = mouse_pos['smoothed_velocity_x'], mouse_pos['smoothed_velocity_y']
+    vel = np.sqrt(x_vel**2 + y_vel**2)
+    mouse_pos['smoothed_speed'] = pd.Series(vel)
+        
+    x_acc, y_acc = mouse_pos['smoothed_acceleration_x'], mouse_pos['smoothed_acceleration_y']
+    acc = np.sqrt(x_acc**2 + y_acc**2)
+    mouse_pos['smoothed_acceleration'] = pd.Series(acc)
+
+def AddKinematics_filter(mouse_pos, filterRes):
+    mouse_pos['filtered_position_x'] = pd.Series(filterRes['xnn'][0][0], index=mouse_pos.index)
+    mouse_pos['filtered_position_y'] = pd.Series(filterRes['xnn'][3][0], index=mouse_pos.index)
+    mouse_pos['filtered_velocity_x'] = pd.Series(filterRes['xnn'][1][0], index=mouse_pos.index)
+    mouse_pos['filtered_velocity_y'] = pd.Series(filterRes['xnn'][4][0], index=mouse_pos.index)
+    mouse_pos['filtered_acceleration_x'] = pd.Series(filterRes['xnn'][2][0], index=mouse_pos.index)
+    mouse_pos['filtered_acceleration_y'] = pd.Series(filterRes['xnn'][5][0], index=mouse_pos.index)
+
+    x_vel, y_vel = mouse_pos['filtered_velocity_x'], mouse_pos['filtered_velocity_y']
+    vel = np.sqrt(x_vel**2 + y_vel**2)
+    mouse_pos['filtered_speed'] = pd.Series(vel)
+        
+    x_acc, y_acc = mouse_pos['filtered_acceleration_x'], mouse_pos['filtered_acceleration_y']
+    acc = np.sqrt(x_acc**2 + y_acc**2)
+    mouse_pos['filtered_acceleration'] = pd.Series(acc)
