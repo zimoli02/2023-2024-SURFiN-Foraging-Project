@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 aeon_mecha_dir = Path(__file__).resolve().parent.parent
-sys.path.append(str(aeon_mecha_dir))
+sys.path.insert(0, str(aeon_mecha_dir))
 
 import aeon
 import aeon.io.api as api
@@ -78,6 +78,7 @@ def main():
         axs[2,0].set_xlabel('Manual Para.')
         axs[2,1].set_ylabel("Learned Para.")
         plt.savefig('../Images/CompareParameters/' + title+'.png')
+        plt.show()
         
         np.save('../Data/MouseKinematicParameters/LL_Manual.npy', LL_Manual)
         np.save('../Data/MouseKinematicParameters/LL_Learned.npy', LL_Learned)

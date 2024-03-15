@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 aeon_mecha_dir = Path(__file__).resolve().parent.parent
-sys.path.append(str(aeon_mecha_dir))
+sys.path.insert(0, str(aeon_mecha_dir))
 
 import aeon
 import aeon.io.api as api
@@ -82,6 +82,7 @@ def PlotStates(mouse_pos, states, title, n):
     cbar.set_ticks(np.arange(0, N))
     cbar.set_ticklabels([f'State {val}' for val in np.arange(0, N)])
     plt.savefig('../Images/HMM_States/' + title+'.png')
+    plt.show()
 
 def PlotStatesShort(n=5):
     N = n 

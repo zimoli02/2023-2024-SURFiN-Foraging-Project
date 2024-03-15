@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 aeon_mecha_dir = Path(__file__).resolve().parent.parent
-sys.path.append(str(aeon_mecha_dir))
+sys.path.insert(0, str(aeon_mecha_dir))
 
 import aeon
 import aeon.io.api as api
@@ -54,6 +54,7 @@ def main():
         axs[2].set_ylabel("Smoothed Vel.")
         axs[3].set_ylabel("Smoothed Acc.")
         plt.savefig('../Images/Kinematics/' + title+'.png')
+        plt.show()
         
     for session, count in zip(list(long_sessions.itertuples()), range(len(long_sessions))):
         title = 'LongSession'+str(count)
@@ -81,6 +82,7 @@ def main():
         axs[2].set_ylabel("Smoothed Vel.")
         axs[3].set_ylabel("Smoothed Acc.")
         plt.savefig('../Images/Kinematics/' + title+'.png')
+        plt.show()
 
 
 if __name__ == "__main__":

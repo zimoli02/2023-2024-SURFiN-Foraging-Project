@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 aeon_mecha_dir = Path(__file__).resolve().parent.parent
-sys.path.append(str(aeon_mecha_dir))
+sys.path.insert(0, str(aeon_mecha_dir))
 
 import aeon
 import aeon.io.api as api
@@ -65,7 +65,7 @@ def main():
         mouse_pos = dfs[0]
         for df in dfs[1:]: mouse_pos = mouse_pos.add(df, fill_value=0)
         
-        states = np.load('../Data/HMMStates'+title+"States_Unit.npy", allow_pickle = True)
+        states = np.load('../Data/HMMStates/'+title+"States_Unit.npy", allow_pickle = True)
         mouse_pos['states'] = pd.Series(states, index=mouse_pos.index)
         
         grouped = mouse_pos.groupby([pd.Grouper(freq='10S'), 'states']).size()
@@ -89,6 +89,7 @@ def main():
             sns.heatmap(manual_trans_mat, cmap='YlGnBu', ax = axs[i], square = 'True', cbar = False, annot=annot_array, annot_kws = {'size':10})
         fig.suptitle("Manual-Calculated Transition Matrix")
         plt.savefig('../Images/HMM_TransitionM/' + title +'MultipleDays.png')
+        plt.show()
         
     
 

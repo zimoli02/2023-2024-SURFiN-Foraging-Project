@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 aeon_mecha_dir = Path(__file__).resolve().parent.parent
-sys.path.append(str(aeon_mecha_dir))
+sys.path.insert(0, str(aeon_mecha_dir))
 
 import aeon
 import aeon.io.api as api

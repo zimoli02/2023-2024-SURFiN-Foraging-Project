@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 aeon_mecha_dir = Path(__file__).resolve().parent.parent
-sys.path.append(str(aeon_mecha_dir))
+sys.path.insert(0, str(aeon_mecha_dir))
 
 import aeon
 import aeon.io.api as api
@@ -81,6 +81,7 @@ def FitModelsShort(n=5):
             axs[i].set_xlabel('X')
             axs[i].set_ylabel('Y')
         plt.savefig('../Images/HMM_Heatmap/' + title+'.png')
+        plt.show()
 
 
     fig, axs = plt.subplots(2, N, figsize = (N*8-2,14))
@@ -99,6 +100,7 @@ def FitModelsShort(n=5):
         axs[1,i].set_xlabel('X')
         axs[0,i].set_title('State' + str(i))    
     plt.savefig('../Images/HMM_Heatmap/ShortAverage.png')
+    plt.show()
 
     # Speed, Acceleration, Visits in Patch 1, Visits in Patch 2
     fig, axs = plt.subplots(4, 1, figsize = (10, 4*7-1))
@@ -111,6 +113,7 @@ def FitModelsShort(n=5):
         axs[i].set_xticks(range(0, 5),[str(i) for i in range(N)])
         axs[i].set_ylabel(FEATURE[i])
     plt.savefig('../Images/HMM_Data/ShortDataAverage.png')
+    plt.show()
     
 def FitModelsLong(n=8):
     N = n
@@ -189,6 +192,7 @@ def FitModelsLong(n=8):
             axs[i].set_xlabel('X')
             axs[i].set_ylabel('Y')
         plt.savefig('../Images/HMM_Heatmap/' + title+'.png')
+        plt.show()
 
     fig, axs = plt.subplots(5, 1, figsize = (10, 5*7-1))
     DATA = [SPEED, ACCE, VISIT_1, VISIT_2, CR]
@@ -200,6 +204,7 @@ def FitModelsLong(n=8):
         axs[i].set_xticks(range(0, N), [str(i) for i in range(N)]) # Change with number of states!!!
         axs[i].set_ylabel(FEATURE[i])
     plt.savefig('../Images/HMM_Data/LongDataAverage.png')
+    plt.show()
 
 def main():
     # For short sessions:

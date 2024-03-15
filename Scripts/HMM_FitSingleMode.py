@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 aeon_mecha_dir = Path(__file__).resolve().parent.parent
-sys.path.append(str(aeon_mecha_dir))
+sys.path.insert(0, str(aeon_mecha_dir))
 
 import aeon
 import aeon.io.api as api
@@ -234,6 +234,7 @@ def FitModelsLong(hmm, index, n=8):
             axs[i].set_xlabel('X')
             axs[i].set_ylabel('Y')
         plt.savefig('../Images/HMM_Heatmap/' + title+'.png')
+        plt.show()
 
 
     # Speed, Acceleration, Visits in Patch 1, Visits in Patch 2
@@ -247,6 +248,7 @@ def FitModelsLong(hmm, index, n=8):
         axs[i].set_xticks(range(0, N), [str(i) for i in range(N)])
         axs[i].set_ylabel(FEATURE[i])
     plt.savefig('../Images/HMM_Data/LongDataUnit.png')
+    plt.show()
 
 
 def main():
