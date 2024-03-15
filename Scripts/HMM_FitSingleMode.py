@@ -21,24 +21,34 @@ import Functions.HMM as HMM
 import Functions.kinematics as kinematics
 import Functions.patch as patch
 
-def main():
-    root = [Path("/ceph/aeon/aeon/data/raw/AEON2/experiment0.2")]
+root = [Path("/ceph/aeon/aeon/data/raw/AEON2/experiment0.2")]
 
-    subject_events = api.load(root, exp02.ExperimentalMetadata.SubjectState)
-    sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
-    short_sessions = sessions.iloc[[4,16,17,20,23,24,25,26,28,29,30,31]]
-    long_sessions = sessions.iloc[[8, 10, 11, 14]]
+subject_events = api.load(root, exp02.ExperimentalMetadata.SubjectState)
+sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
+short_sessions = sessions.iloc[[4,16,17,20,23,24,25,26,28,29,30,31]]
+long_sessions = sessions.iloc[[8, 10, 11, 14]]
+
+feature = ['weight', 'smoothed_speed', 'smoothed_acceleration']
+
+def ShortSessionModel(id = 7, n=5):
+    N = n
     
-    N = 5
-    feature = ['weight', 'smoothed_speed', 'smoothed_acceleration']
-    
-    title = 'ShortSession'+str(7)  
+    title = 'ShortSession'+str(id)  
     mouse_pos = pd.read_parquet('../Data/MousePos' + title + 'mousepos.parquet', engine='pyarrow')
+    
     obs = np.array(mouse_pos[feature])
     hmm, states, transition_mat, lls = HMM.FitHMM(obs, num_states = N, n_iters = 50)
+    
     state_mean_speed = hmm.observations.params[0].T[1]
-    index = np.argsort(state_mean_speed, -1)        
-    HMM.PlotTransition(transition_mat[index].T[index].T, title = '../Images/HMM_TransitionM/SingleModel'+'.png')
+    index = np.argsort(state_mean_speed, -1)     
+    
+    HMM.PlotTransition(transition_mat[index].T[index].T, title = '../Images/HMM_TransitionM/ShortModel'+'.png')
+    np.save('../Data/HMMStates/' + title + "TransM_Unit.npy", transition_mat[index].T[index].T)
+    
+    return hmm, index
+
+def FitModelsShort(hmm, index, n=5):
+    N = n 
     
     X, Y, SPEED, ACCE, VISIT_1, VISIT_2 = [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)]
     HEATMAP = [[] for _ in range(N)]
@@ -49,17 +59,12 @@ def main():
         mouse_pos = pd.read_parquet('../Data/MousePos' + title + 'mousepos.parquet', engine='pyarrow')
     
         obs = np.array(mouse_pos[feature])
-        hmm, states, transition_mat, lls = HMM.FitHMM(obs, num_states = N, n_iters = 50)
-
-        state_mean_speed = hmm.observations.params[0].T[1]
-        index = np.argsort(state_mean_speed, -1)
-                
-        HMM.PlotTransition(transition_mat[index].T[index].T, title = '../Images/HMM_TransitionM/' + title+'.png')
+        states = hmm.most_likely_states(obs)
 
         new_values = np.empty_like(states)
         for i, val in enumerate(index): new_values[states == val] = i
         states = new_values
-        np.save('../Data/HMMStates/' + title + "States_Unit.npy")
+        np.save('../Data/HMMStates/' + title + "States_Unit.npy", states)
             
         x = mouse_pos['smoothed_position_x']
         y = mouse_pos['smoothed_position_y']
@@ -104,7 +109,7 @@ def main():
         axs[1,i].set_ylabel('Y')
         axs[1,i].set_xlabel('X')
         axs[0,i].set_title('State' + str(i))    
-    plt.savefig('../Images/HMM_Heatmap/Unit.png')
+    plt.savefig('../Images/HMM_Heatmap/ShortUnit.png')
 
     # Speed, Acceleration, Visits in Patch 1, Visits in Patch 2
     fig, axs = plt.subplots(4, 1, figsize = (10, 4*7-1))
@@ -114,9 +119,144 @@ def main():
         means = [np.mean(arr) for arr in data]
         std_devs = [np.std(arr) for arr in data]
         axs[i].bar(range(N), means, yerr=std_devs, capsize=5)
-        axs[i].set_xticks(range(0, 5), ['0', '1', '2', '3','4'])
+        axs[i].set_xticks(range(0, N), [str(i) for i in range(N)])
         axs[i].set_ylabel(FEATURE[i])
-    plt.savefig('../Images/HMM_Data/DataUnit.png')
+    plt.savefig('../Images/HMM_Data/ShortDataUnit.png')
+
+def LongSessionModel(id = 1, n = 8):
+    N = n
+    title = 'LongSession'+str(id)
+    for session, j in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
+        if j != id: continue
+    
+    start, end = session.enter, session.exit
+    mouse = api.load(root, exp02.CameraTop.Position, start=start, end=end)
+            
+    mouse = kinematics.ProcessRawData(mouse, root, start, end)
+            
+    patch.AddKinematics(title, mouse)
+            
+    mouse_pos_subs = patch.SeparateDF(mouse)
+
+    dfs = []
+    for mouse_pos_sub in mouse_pos_subs:
+        mouse_pos_sub = mouse_pos_sub[mouse_pos_sub['smoothed_speed'] <= 2000]
+        mouse_pos_sub = mouse_pos_sub[mouse_pos_sub['smoothed_acceleration'] <= 60000]
+        mouse_pos_sub = HMM.DeleteRows(mouse_pos_sub)
+                
+        start, end = mouse_pos_sub.index[0], mouse_pos_sub.index[-1]
+                    
+        weight = api.load(root, exp02.Nest.WeightSubject, start=start, end=end)
+        patch.AddWeight(mouse_pos_sub, weight)
+
+        mouse_pos_sub = mouse_pos_sub.loc[:,['weight', 'smoothed_speed', 'smoothed_acceleration']]  
+        dfs.append(mouse_pos_sub)
+
+    mouse_pos = dfs[0]
+    for df in dfs[1:]: mouse_pos = mouse_pos.add(df, fill_value=0)
+    
+    obs = np.array(mouse_pos[feature])
+    hmm, states, transition_mat, lls = HMM.FitHMM(obs, num_states = N, n_iters = 50)
+
+    state_mean_speed = hmm.observations.params[0].T[1]
+    index = np.argsort(state_mean_speed, -1)
+
+    HMM.PlotTransition(transition_mat[index].T[index].T, title = '../Images/HMM_TransitionM/LongModel.png')
+    np.save('../Data/HMMStates/' + title + "TransM_Unit.npy", transition_mat[index].T[index].T)
+
+def FitModelsLong(hmm, index, n=8):
+    N = n
+    for session, j in zip(list(long_sessions.itertuples()), range(len(long_sessions))):
+        title = 'LongSession'+str(j)
+                                
+        start, end = session.enter, session.exit
+        mouse = api.load(root, exp02.CameraTop.Position, start=start, end=end)
+            
+        mouse = kinematics.ProcessRawData(mouse, root, start, end)
+            
+        patch.AddKinematics(title, mouse)
+            
+        mouse_pos_subs = patch.SeparateDF(mouse)
+
+        dfs = []
+        for mouse_pos_sub in mouse_pos_subs:
+            mouse_pos_sub = mouse_pos_sub[mouse_pos_sub['smoothed_speed'] <= 2000]
+            mouse_pos_sub = mouse_pos_sub[mouse_pos_sub['smoothed_acceleration'] <= 60000]
+            mouse_pos_sub = HMM.DeleteRows(mouse_pos_sub)
+                
+            start, end = mouse_pos_sub.index[0], mouse_pos_sub.index[-1]
+                
+            weight = api.load(root, exp02.Nest.WeightSubject, start=start, end=end)
+            patch.AddWeight(mouse_pos_sub, weight)
+
+            patch.InPatch(mouse_pos_sub)
+                
+            hours_series = pd.Series(mouse_pos_sub.index.hour, index=mouse_pos_sub.index)
+            mouse_pos_sub['CR'] = hours_series.apply(patch.calculate_cr)
+            mouse_pos_sub = mouse_pos_sub.loc[:,['weight', 'smoothed_position_x', 'smoothed_position_y', 'smoothed_speed', 'smoothed_acceleration','Patch1','Patch2', 'CR']]
+                
+            dfs.append(mouse_pos_sub)
+
+        mouse_pos = dfs[0]
+        for df in dfs[1:]: mouse_pos = mouse_pos.add(df, fill_value=0)
+
+            
+        SPEED, ACCE, VISIT_1, VISIT_2, CR = [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)]
+            
+        obs = np.array(mouse_pos[feature])
+        states = hmm.most_likely_states(obs)
+                    
+        new_values = np.empty_like(states)
+        for i, val in enumerate(index): new_values[states == val] = i
+        states = new_values
+        np.save('../Data/HMMStates/' + title + "States_Unit.npy", states)
+            
+        x = mouse_pos['smoothed_position_x']
+        y = mouse_pos['smoothed_position_y']
+        speed = mouse_pos['smoothed_speed']
+        acceleration = mouse_pos['smoothed_acceleration']
+        VisitPatch1 = mouse_pos['Patch1']
+        VisitPatch2 = mouse_pos['Patch2']
+            
+        for i in range(N):
+            SPEED[i] = np.concatenate([SPEED[i], speed[states==i]])
+            ACCE[i] = np.concatenate([ACCE[i], acceleration[states == i]])
+            VISIT_1[i] = np.concatenate([VISIT_1[i], VisitPatch1[states == i]])
+            VISIT_2[i] = np.concatenate([VISIT_2[i], VisitPatch2[states == i]])
+            
+        fig, axs = plt.subplots(1, N, figsize = (N*8-2,6))
+        for i in range(N):
+            heatmap, xedges, yedges, img = axs[i].hist2d(x[states == i], y[states == i], bins=[50, 50], range=[[215, 1235], [65, 1065]], cmap='binary', density=True)
+            heatmap = np.nan_to_num(heatmap)
+            axs[i].set_xlim(205, 1255)
+            axs[i].set_ylim(45, 1085)
+            axs[i].set_title('State' + str(i))
+            axs[i].set_xlabel('X')
+            axs[i].set_ylabel('Y')
+        plt.savefig('../Images/HMM_Heatmap/' + title+'.png')
+
+
+    # Speed, Acceleration, Visits in Patch 1, Visits in Patch 2
+    fig, axs = plt.subplots(4, 1, figsize = (10, 4*7-1))
+    DATA = [SPEED, ACCE, VISIT_1, VISIT_2]
+    FEATURE = ['SPEED', 'ACCE', 'VISIT_1', 'VISIT_2']
+    for data, i in zip(DATA, range(len(DATA))):
+        means = [np.mean(arr) for arr in data]
+        std_devs = [np.std(arr) for arr in data]
+        axs[i].bar(range(N), means, yerr=std_devs, capsize=5)
+        axs[i].set_xticks(range(0, N), [str(i) for i in range(N)])
+        axs[i].set_ylabel(FEATURE[i])
+    plt.savefig('../Images/HMM_Data/LongDataUnit.png')
+
+
+def main():
+    
+    hmm, index = ShortSessionModel()
+    FitModelsShort(hmm, index)
+    
+    hmm, index = LongSessionModel()
+    FitModelsLong(hmm, index)
+    
     
     
 if __name__ == "__main__":
