@@ -73,7 +73,7 @@ def main():
     TYPES = ['Poisson', 'Gaussian', 'Gamma']
     
     VISIT = ConcatenateSessions()
-    X, Y = Variables(VISIT, feature = ['speed','acceleration', 'weight','PelletsInLastVisitSelf', 'PelletsInLastVisitOther', 'IntervalLastVisit' ,'entry'], predictor='duration')
+    X, Y = Variables(VISIT, feature = ['speed','acceleration', 'weight','PelletsInLastVisitSelf', 'PelletsInLastVisitOther', 'IntervalLastVisit' ,'entry'], predictor='distance')
     
     for TYPE in TYPES:
         result, y_pred = Model(X, Y, type = TYPE)

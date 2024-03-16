@@ -1,0 +1,32 @@
+Traceback (most recent call last):
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 21, in <module>
+    import Functions.kinematics as kinematics
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/kinematics.py", line 3, in <module>
+    import inference
+ModuleNotFoundError: No module named 'inference'
+Traceback (most recent call last):
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 82, in <module>
+    main()
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 77, in main
+    ProcessShortSessions()
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 62, in ProcessShortSessions
+    ProcessSession(session, title)
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 37, in ProcessSession
+    mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end)
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/kinematics.py", line 160, in ProcessRawData
+    mouse_pos = ExcludeMaintenanceData(mouse_pos, GetExperimentTimes(root, start, end))
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/kinematics.py", line 145, in ExcludeMaintenanceData
+    [
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/kinematics.py", line 146, in <listcomp>
+    data.loc[start:stop]
+AttributeError: 'NoneType' object has no attribute 'loc'
+Traceback (most recent call last):
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 82, in <module>
+    main()
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 77, in main
+    ProcessShortSessions()
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 62, in ProcessShortSessions
+    ProcessSession(session, title)
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 39, in ProcessSession
+    obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())
+TypeError: 'NoneType' object is not subscriptable
