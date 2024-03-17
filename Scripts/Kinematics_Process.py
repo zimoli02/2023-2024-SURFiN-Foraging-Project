@@ -30,6 +30,7 @@ long_sessions = sessions.iloc[[8, 10, 11, 14]]
 def ProcessSession(session, title):
     P = np.load('../Data/MouseKinematicParameters/RecentParameters.npz', allow_pickle=True)
     sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, V0, Z, R = P['sigma_a'].item(), P['sigma_x'].item(), P['sigma_y'].item(), P['sqrt_diag_V0_value'].item(), P['B'], P['Qe'], P['m0'], P['V0'], P['Z'], P['R']
+    dt = 0.02 
     
     start, end = session.enter, session.exit
     mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
@@ -39,11 +40,11 @@ def ProcessSession(session, title):
     obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())
 
     # Use the first 60 seconds position data to learn the LDS parameters
-    sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, V0, Z, R = kinematics.LDSParameters_Learned(obs[:,:6000], dt, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z)
+    sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, m0, V0, Z, R = kinematics.LDSParameters_Learned(obs[:,:6000], sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z)
     np.savez('../Data/MouseKinematicParameters/' + title + 'Parameters.npz', sigma_a = sigma_a, sigma_x = sigma_x, sigma_y = sigma_y, sqrt_diag_V0_value = sqrt_diag_V0_value, B = B, Qe = Qe, m0 = m0, V0 = V0, Z = Z, R = R)
     np.savez('../Data/MouseKinematicParameters/RecentParameters.npz', sigma_a = sigma_a, sigma_x = sigma_x, sigma_y = sigma_y, sqrt_diag_V0_value = sqrt_diag_V0_value, B = B, Qe = Qe, m0 = m0, V0 = V0, Z = Z, R = R)
         
-    Q = sigma_a**2*Qe
+    Q = (sigma_a**2) * Qe
 
     # Filtering
     filterRes = inference.filterLDS_SS_withMissingValues_np(
@@ -72,10 +73,10 @@ def main():
     
     sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, V0, Z, R = kinematics.LDSParameters_Manual(dt=0.02)
     np.savez('../Data/MouseKinematicParameters/RecentParameters.npz', sigma_a = sigma_a, sigma_x = sigma_x, sigma_y = sigma_y, sqrt_diag_V0_value = sqrt_diag_V0_value, B = B, Qe = Qe, m0 = m0, V0 = V0, Z = Z, R = R)
-
+    
         
     ProcessShortSessions()
-    ProcessLongSessions()
+    #ProcessLongSessions()
         
 
 if __name__ == "__main__":

@@ -30,3 +30,333 @@ Traceback (most recent call last):
   File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 39, in ProcessSession
     obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())
 TypeError: 'NoneType' object is not subscriptable
+Traceback (most recent call last):
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 82, in <module>
+    main()
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 77, in main
+    ProcessShortSessions()
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 62, in ProcessShortSessions
+    ProcessSession(session, title)
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 42, in ProcessSession
+    sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, V0, Z, R = kinematics.LDSParameters_Learned(obs[:,:6000], dt, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z)
+NameError: name 'dt' is not defined
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:225: UserWarning: The use of `x.T` on tensors of dimension other than 2 to reverse their shape is deprecated and it will throw an error in a future release. Consider `x.mT` to transpose batches of matrices or `x.permute(*torch.arange(x.ndim - 1, -1, -1))` to reverse the dimensions of a tensor. (Triggered internally at ../aten/src/ATen/native/TensorShape.cpp:3614.)
+  innov.T @ Sinv @ innov
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: invalid value encountered in subtract
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: invalid value encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/aeon/io/api.py:145: UserWarning: data index for CameraTop_200_* contains out-of-order timestamps!
+  warnings.warn(f"data index for {reader.pattern} contains out-of-order timestamps!")
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:225: UserWarning: The use of `x.T` on tensors of dimension other than 2 to reverse their shape is deprecated and it will throw an error in a future release. Consider `x.mT` to transpose batches of matrices or `x.permute(*torch.arange(x.ndim - 1, -1, -1))` to reverse the dimensions of a tensor. (Triggered internally at ../aten/src/ATen/native/TensorShape.cpp:3614.)
+  innov.T @ Sinv @ innov
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: invalid value encountered in subtract
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: invalid value encountered in subtract
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: invalid value encountered in subtract
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+--------------------------------------------------------------------------------
+epoch: 0
+likelihood: -6943720.2919041095
+sigma_a: 
+tensor([25.6512], requires_grad=True)
+sqrt_diag_R: 
+tensor([0.0118, 0.0897], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([0.2811, 0.0568, 0.0314, 0.5041, 0.0077, 0.0023], dtype=torch.float64,
+       requires_grad=True)
+sqrt_diag_V0: 
+tensor([ 1.5156e+01, -8.1090e-03,  5.0646e-04,  1.0738e+01,  8.7459e-04,
+         9.8769e-04], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 1
+likelihood: -28433.600411537478
+sigma_a: 
+tensor([23.9688], requires_grad=True)
+sqrt_diag_R: 
+tensor([0.0097, 0.0670], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([32.8413, 12.0749,  6.7757, 27.0135, -4.4273,  0.2453],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([4.8038e+02, 1.0914e-01, 6.9475e-03, 4.2770e+02, 3.5558e-03, 1.0500e-03],
+       dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 2
+likelihood: -27859.49905312049
+sigma_a: 
+tensor([24.1320], requires_grad=True)
+sqrt_diag_R: 
+tensor([0.0077, 0.0795], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 411.5657,  155.4614,   73.3833,  335.3705, -103.3133,   44.7365],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([ 5.8900e+03, -5.2882e-01,  4.8491e-02,  5.2768e+03,  1.1064e-01,
+         5.7052e-03], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 3
+likelihood: -27812.257143830717
+sigma_a: 
+tensor([23.8931], requires_grad=True)
+sqrt_diag_R: 
+tensor([-0.0018, -0.0092], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 376.8981,  156.1149,   54.0009,  307.0795, -146.0681,  122.3855],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([ 5.3927e+03,  7.7041e-01, -2.1904e-03,  4.8306e+03, -1.5044e-01,
+        -2.4163e-03], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 4
+likelihood: -27806.984262433896
+sigma_a: 
+tensor([23.8947], requires_grad=True)
+sqrt_diag_R: 
+tensor([2.5971e-05, 2.0212e-03], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([  25.9856,  149.3108,   57.3893,   20.0037, -148.2332,  125.5879],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([3.2828e+02, 4.3300e+01, 2.5358e-02, 2.8613e+02, 5.3634e+00, 4.0346e-02],
+       dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 5
+likelihood: -27803.184722851693
+sigma_a: 
+tensor([23.8916], requires_grad=True)
+sqrt_diag_R: 
+tensor([-0.0002, -0.0007], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([  34.5670,  157.1852,   59.5818,   23.7592, -147.4754,  128.2874],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([ 3.1604e+02, -1.2561e-01, -8.5494e-02,  2.6922e+02,  1.2313e-01,
+         4.3455e-01], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 6
+likelihood: -27802.167756830768
+sigma_a: 
+tensor([23.8784], requires_grad=True)
+sqrt_diag_R: 
+tensor([-0.0037,  0.0165], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 326.0543,  149.4340,   72.1821,  172.3670, -149.7075,  134.5236],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([377.6819,  -1.1373,  -9.7367,   6.2169,  -1.4208,  55.5530],
+       dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 7
+likelihood: -27799.025836974655
+sigma_a: 
+tensor([23.8905], requires_grad=True)
+sqrt_diag_R: 
+tensor([-5.1293e-05,  1.3816e-04], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 320.6749,  166.1196,   47.0195,  168.4419, -144.9236,  122.7570],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([ 3.6544e+02, -1.3762e-01, -7.2433e+00, -1.7435e-02,  3.2279e-01,
+         4.2033e+01], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 8
+likelihood: -27797.41595411097
+sigma_a: 
+tensor([23.8903], requires_grad=True)
+sqrt_diag_R: 
+tensor([-7.9113e-05,  2.2755e-04], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 296.9218,  160.6526,   55.6038,  168.4967, -146.1502,  126.5153],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([ 3.0778e+02, -1.5799e-01,  1.0210e+01, -2.9904e-02,  5.3562e-02,
+         2.1384e+00], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 9
+likelihood: -27796.631391263294
+sigma_a: 
+tensor([23.9026], requires_grad=True)
+sqrt_diag_R: 
+tensor([ 0.0012, -0.0035], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 284.1324,  161.5465,   55.5467,  168.7283, -148.7897,  128.8694],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([ 2.5174e+02, -1.0529e+00,  4.5748e+00,  1.8981e-01, -1.5139e+00,
+         1.0460e+00], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 10
+likelihood: -27796.471564673346
+sigma_a: 
+tensor([23.8893], requires_grad=True)
+sqrt_diag_R: 
+tensor([-7.2916e-05,  9.7489e-04], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 448.4057,  159.8493,   56.6758,  168.4189, -146.1938,  125.9170],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([-15.1077,   0.6516,   0.0971,  -0.2077,  -0.4896,   0.4731],
+       dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 11
+likelihood: -27793.70326621448
+sigma_a: 
+tensor([23.8890], requires_grad=True)
+sqrt_diag_R: 
+tensor([6.9875e-08, 6.7552e-06], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 437.5498,  160.4555,   55.7482,  168.5224, -146.0912,  126.4810],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([-1.0170e-04, -5.0217e-04, -8.4805e-04, -9.0472e-05, -1.9394e-03,
+         1.6450e-04], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 12
+likelihood: -27791.588566967857
+sigma_a: 
+tensor([23.8890], requires_grad=True)
+sqrt_diag_R: 
+tensor([3.5563e-07, 4.6293e-07], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 437.5499,  160.4534,   55.7503,  168.5225, -146.0945,  126.4834],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([ 1.2319e-05, -1.9182e-05,  1.1254e-04, -2.4297e-05,  2.4166e-04,
+        -1.1468e-04], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 13
+likelihood: -27791.588566940456
+sigma_a: 
+tensor([23.8890], requires_grad=True)
+sqrt_diag_R: 
+tensor([3.1363e-07, 3.8972e-07], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 437.5499,  160.4533,   55.7503,  168.5225, -146.0946,  126.4834],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([ 1.1224e-05, -1.6000e-05,  1.0223e-04, -2.1198e-05,  2.1770e-04,
+        -1.0138e-04], dtype=torch.float64, requires_grad=True)
+ShortSession0
+ShortSession1
+ShortSession2
+ShortSession3
+ShortSession4
+ShortSession5
+ShortSession6
+ShortSession7
+ShortSession8
+ShortSession9
+ShortSession10
+ShortSession11
