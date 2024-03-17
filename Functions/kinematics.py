@@ -1,7 +1,5 @@
 import numpy as np
 import pandas as pd
-import inference
-import learning
 import torch
 
 from typing import Union
@@ -17,6 +15,9 @@ sys.path.insert(0, str(parent_dir))
 
 import aeon
 from aeon.schema.dataset import exp02
+
+import Functions.inference as inference
+import Functions.learning as learning
 
 
 def NestError(last_positions, next_positions):
@@ -58,6 +59,7 @@ def FixNestError(mouse_pos, nest_upper = 575, nest_lower = 475):
     for group, data in df[nest_blocks].groupby((nest_blocks != nest_blocks.shift()).cumsum()):
         df.loc[(df.index.isin(data.index)) & (df['y'] > nest_upper), 'y'] = nest_upper
         df.loc[(df.index.isin(data.index)) & (df['y'] < nest_lower), 'y'] = nest_lower
+    return df
         
 def GetExperimentTimes(
     root: Union[str, os.PathLike], start_time: pd.Timestamp, end_time: pd.Timestamp
@@ -150,12 +152,14 @@ def ExcludeMaintenanceData(
 
 
 def ProcessRawData(mouse_pos, root, start, end):
+    mouse_pos = ExcludeMaintenanceData(mouse_pos, GetExperimentTimes(root, start, end))
+    
     temp_df = mouse_pos.dropna(subset=['x', 'y'])
     first_valid_index, last_valid_index = temp_df.index[0], temp_df.index[-1]
     mouse_pos = mouse_pos.loc[first_valid_index:last_valid_index]
     
     mouse_pos = FixNan(mouse_pos)
-    mouse_pos = ExcludeMaintenanceData(mouse_pos, GetExperimentTimes(root, start, end))
+    mouse_pos = FixNestError(mouse_pos)
     
     return mouse_pos
     
@@ -166,7 +170,7 @@ def LDSParameters_Manual(dt):
     acc_x0, acc_y0 = 0.0, 0.0
 
     # Manual Parameters
-    sigma_a = 0.5
+    sigma_a = 1.3
     sqrt_diag_V0_value = 1e-3
 
     m0 = np.array([pos_x0, vel_x0, acc_x0, pos_y0, vel_y0, acc_y0], dtype=np.double)
@@ -182,12 +186,12 @@ def LDSParameters_Manual(dt):
                 dtype=np.double)
 
 
-    Qe = np.array([[dt**5/20, dt**4/8, dt**3/6, 0, 0, 0],
-                [dt**4/8, dt**3/3,  dt**2/2, 0, 0, 0],
-                [dt**3/6, dt**2/2,  dt,      0, 0, 0],
-                [0, 0, 0,                    dt**5/20, dt**4/8, dt**3/6],
-                [0, 0, 0,                    dt**4/8, dt**3/3,  dt**2/2],
-                [0, 0, 0,                    dt**3/6, dt**2/2,  dt]],
+    Qe = np.array([[dt**4/4, dt**3/2, dt**2/2, 0, 0, 0],
+                   [dt**3/2, dt**2,   dt,      0, 0, 0],
+                   [dt**2/2, dt,      1,       0, 0, 0],
+                   [0, 0, 0, dt**4/4, dt**3/2, dt**2/2],
+                   [0, 0, 0, dt**3/2, dt**2,   dt],
+                   [0, 0, 0, dt**2/2, dt,      1]],
                 dtype=np.double)
     Q = sigma_a**2 * Qe
 
@@ -202,18 +206,18 @@ def LDSParameters_Manual(dt):
     return sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, V0, Z, R
 
 
-def LDSParameters_Learned(y, dt, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z):
+def LDSParameters_Learned(y, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z, dt = 0.02):
     pos_x0, pos_y0 = y[0,0], y[1,0]
-    vel_x0, vel_y0 = 0.0, 0.0
-    acc_x0, acc_y0 = 0.0, 0.0
+    vel_x0, vel_y0 = (y[0,1] - y[0,0])/dt, (y[1,1] - y[1,0])/dt
+    acc_x0, acc_y0 = (y[0,2] - y[0,0])/(dt**2), (y[1,2] - y[1,0])/(dt**2)
     
     # Learning Parameters
-    lbfgs_max_iter = 2
-    lbfgs_tolerance_grad = -1
-    lbfgs_tolerance_change = 1e-2
-    lbfgs_lr = 0.01
-    lbfgs_n_epochs = 75
-    lbfgs_tol = 1e-2
+    lbfgs_max_iter = 20
+    lbfgs_tolerance_grad = 1e-7
+    lbfgs_tolerance_change = 1e-9
+    lbfgs_lr = 1.0
+    lbfgs_n_epochs = 100
+    lbfgs_tol = 1e-6
     
     Qe_reg_param_learned = 1e-2
     sqrt_diag_R_torch = torch.DoubleTensor([sigma_x, sigma_y])
@@ -249,12 +253,11 @@ def LDSParameters_Learned(y, dt, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, 
     sigma_x = optim_res_learned["estimates"]["sqrt_diag_R"].numpy()[0]
     sigma_y = optim_res_learned["estimates"]["sqrt_diag_R"].numpy()[1]
     sqrt_diag_V0_value = optim_res_learned["estimates"]["sqrt_diag_V0"].numpy()
-    Q = sigma_a**2*Qe
     m0 = optim_res_learned["estimates"]["m0"].numpy()
     V0 = np.diag(sqrt_diag_V0_value**2)
     R = np.diag(optim_res_learned["estimates"]["sqrt_diag_R"].numpy()**2)
 
-    return sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value[0], B, Q, m0, V0, Z, R
+    return sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value[0], B, m0, V0, Z, R
 
 
 def AddKinematics(title, mouse_pos):

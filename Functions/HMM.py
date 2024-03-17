@@ -1,3 +1,6 @@
+import seaborn as sns
+import matplotlib.pyplot as plt
+import pandas as pd
 import autograd.numpy as np
 import autograd.numpy.random as npr
 npr.seed(0)
@@ -12,10 +15,6 @@ sys.path.insert(0, str(parent_dir))
 import SSM.ssm as ssm
 from SSM.ssm.util import find_permutation
 from SSM.ssm.plots import gradient_cmap, white_to_color_cmap
-
-import seaborn as sns
-import matplotlib.pyplot as plt
-import pandas as pd
 
 sns.set_style("white")
 sns.set_context("talk")
