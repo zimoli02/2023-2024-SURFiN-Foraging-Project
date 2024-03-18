@@ -26,6 +26,18 @@ subject_events = api.load(root, exp02.ExperimentalMetadata.SubjectState)
 sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
 short_sessions = sessions.iloc[[4,16,17,20,23,24,25,26,28,29,30,31]]
 long_sessions = sessions.iloc[[8, 10, 11, 14]]
+
+def FindValidData(obs, length_lower = 2000, length_upper = 6000):
+    nan_indices = np.where(np.isnan(obs[0]))[0]
+    non_nan_blocks = nan_indices[1:] - nan_indices[:-1]
+    start, end = 0, nan_indices[0] - 1
+    for i in range(len(non_nan_blocks)):
+        if non_nan_blocks[i] > length_lower and non_nan_blocks[i] < length_upper:
+            start = nan_indices[i] + 1
+            end = nan_indices[i+1] - 1
+                
+    return obs[:,start:end]
+    
     
 def ProcessSession(session, title, param):
     
@@ -41,8 +53,8 @@ def ProcessSession(session, title, param):
     sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, V0, Z, R = P['sigma_a'].item(), P['sigma_x'].item(), P['sigma_y'].item(), P['sqrt_diag_V0_value'].item(), P['B'], P['Qe'], P['m0'], P['V0'], P['Z'], P['R']
     
     if param != 'Manual':
-        # Use the first 60 seconds position data to learn the LDS parameters
-        sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, m0, V0, Z, R = kinematics.LDSParameters_Learned(obs[:,:6000], sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z)
+        obs_valid = FindValidData(obs)
+        sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, m0, V0, Z, R = kinematics.LDSParameters_Learned(obs_valid, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z)
         np.savez('../Data/MouseKinematicParameters/' + title + 'Parameters.npz', sigma_a = sigma_a, sigma_x = sigma_x, sigma_y = sigma_y, sqrt_diag_V0_value = sqrt_diag_V0_value, B = B, Qe = Qe, m0 = m0, V0 = V0, Z = Z, R = R)
         
     Q = (sigma_a**2) * Qe
@@ -60,6 +72,7 @@ def ProcessSession(session, title, param):
     
 def ProcessShortSessions(param = 'Manual'):
     for session, count in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
+        if count == 0: continue
         title = 'ShortSession'+str(count)
         ProcessSession(session, title, param = param)
         print(title)

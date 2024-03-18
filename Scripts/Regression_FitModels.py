@@ -50,7 +50,7 @@ def ConcatenateSessions():
     
     return VISIT
 
-def Variables(VISIT, feature, predictor = 'duration'):
+def Variables(VISIT, feature, predictor = 'distance'):
     X = VISIT[feature]
     scaler = StandardScaler()
     X = pd.DataFrame(scaler.fit_transform(X), index = X.index, columns = X.columns)
@@ -59,53 +59,96 @@ def Variables(VISIT, feature, predictor = 'duration'):
     
     return X, Y
 
-def Model(X, Y, type = 'Poisson'):
+def FitModel(X, Y, type):
     if type == 'Poisson': model = sm.GLM(Y, X, family=sm.families.Poisson())
     if type == 'Gaussian': model = sm.GLM(Y, X, family=sm.families.Gaussian())
     if type == 'Gamma': model = sm.GLM(Y, X, family=sm.families.Gamma(sm.families.links.Log()))
+    return model
+
+def CrossValidation(X, Y, type, split_perc = 0.75):
+    split_size = int(len(Y) * split_perc)
+    indices = np.arange(len(Y))
+    
+    CORR = []
+    corr_max = -1
+    
+    for i in range(1000):
+        np.random.shuffle(indices)
+        
+        train_indices = indices[:split_size]
+        test_indices = indices[split_size:]
+
+        X_train, X_test = X.iloc[train_indices], X.iloc[test_indices]
+        Y_train, Y_test = Y.iloc[train_indices], Y.iloc[test_indices]
+        
+        model = FitModel(X_train,Y_train,type)
+        result = model.fit()
+        
+        Y_test_pred = result.predict(X_test)
+        corr = np.corrcoef(Y_test, Y_test_pred)[0,1]
+        CORR.append(corr)
+        
+        if corr > corr_max: model_valid = model
+    
+    return model_valid, np.mean(CORR)
+        
+    
+def Model(X, Y, type = 'Poisson'):
+    model, average_corre = CrossValidation(X, Y, type)
     
     result = model.fit()
     y_pred = result.predict(X)
     
-    return result, y_pred
+    return result, y_pred, average_corre
+
+def PlotModelPrediction(obs, pred, predictor = 'Distance', TYPE = 'Poisson'):
+    fig, axs = plt.subplots(2, 1, figsize=(15, 5), sharex=True)
+    axs[0].plot(obs.to_numpy(), color = 'black')
+    axs[0].set_xticks([]) 
+    axs[0].set_facecolor('white') 
+    axs[0].set_ylabel(predictor, fontsize = 12)
+    axs[0].spines['top'].set_visible(False)
+    axs[0].spines['right'].set_visible(False)
+
+    axs[1].plot(pred.to_numpy(), color = 'blue', label = 'Correlation: '+str(round(np.corrcoef(obs, pred)[0,1],4)))
+    axs[1].set_xticks([]) 
+    axs[1].set_facecolor('white') 
+    axs[1].set_ylabel(predictor + ' Pred.', fontsize = 14)
+    axs[1].spines['top'].set_visible(False)
+    axs[1].spines['right'].set_visible(False)
+    axs[1].legend()
+        
+    plt.savefig('../Images/Regression/AllSessionsData/' + TYPE + '.png')
+    plt.show()
+
+
+def PrintModelSummary(result, TYPE):
+    fig, axs = plt.subplots(figsize=(20, 8))
+    axs.axis('off')
+    axs.text(0.5, 0.5, str(result.summary()),
+                verticalalignment='center', horizontalalignment='left',
+                transform=axs.transAxes, fontsize=12)
+    plt.savefig('../Images/Regression/AllSessionsParams/' + TYPE + '.png')
+    plt.show()   
+
 
 def main():
     TYPES = ['Poisson', 'Gaussian', 'Gamma']
+    PREDICTOR = 'distance'
     
     VISIT = ConcatenateSessions()
-    X, Y = Variables(VISIT, feature = ['speed','acceleration', 'weight','PelletsInLastVisitSelf', 'PelletsInLastVisitOther', 'IntervalLastVisit' ,'entry'], predictor='distance')
+    X, Y = Variables(VISIT, feature = ['speed','acceleration', 'weight','PelletsInLastVisitSelf', 'PelletsInLastVisitOther', 'IntervalLastVisit' ,'entry'], predictor=PREDICTOR)
     
     for TYPE in TYPES:
-        result, y_pred = Model(X, Y, type = TYPE)
+        result, y_pred, average_corre = Model(X, Y, type = TYPE)
+        print("Average Correlation for " + TYPE + " Model Fitted: ", average_corre)
         
-        fig, axs = plt.subplots(2, 1, figsize=(15, 5), sharex=True)
-
-        axs[0].plot(Y.to_numpy(), color = 'black')
-        axs[0].set_xticks([]) 
-        axs[0].set_facecolor('white') 
-        axs[0].set_ylabel('Duration', fontsize = 12)
-        axs[0].spines['top'].set_visible(False)
-        axs[0].spines['right'].set_visible(False)
-
-        axs[1].plot(y_pred.to_numpy(), color = 'blue', label = 'Correlation: '+str(round(np.corrcoef(Y, y_pred)[0,1],4)))
-        axs[1].set_xticks([]) 
-        axs[1].set_facecolor('white') 
-        axs[1].set_ylabel('Dur. Pred.', fontsize = 14)
-        axs[1].spines['top'].set_visible(False)
-        axs[1].spines['right'].set_visible(False)
-        axs[1].legend()
+        PlotModelPrediction(Y, y_pred, predictor=PREDICTOR, TYPE = TYPE)
         
-        plt.savefig('../Images/Regression/AllSessionsData/' + TYPE + '.png')
-        plt.show()
+        PrintModelSummary(result, TYPE)
         
         
-        fig, axs = plt.subplots(figsize=(20, 8))
-        axs.axis('off')
-        axs.text(0.5, 0.5, str(result.summary()),
-                verticalalignment='center', horizontalalignment='left',
-                transform=axs.transAxes, fontsize=12)
-        plt.savefig('../Images/Regression/AllSessionsParams/' + TYPE + '.png')
-        plt.show()
+        
         
 
 if __name__ == "__main__":

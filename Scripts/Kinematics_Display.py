@@ -47,11 +47,22 @@ def Display(session, title):
     mouse_pos.smoothed_speed.plot(ax = axs[2])
     mouse_pos.smoothed_acceleration.plot(ax = axs[3])
         
-    axs[0].set_ylabel('Raw Pos.')
-    axs[1].set_ylabel("Smoothed Pos.")
-    axs[2].set_ylabel("Smoothed Vel.")
-    axs[3].set_ylabel("Smoothed Acc.")
+    axs[0].set_ylabel('Raw Pos.',fontsize = 16)
+    axs[1].set_ylabel("Smoothed Pos.",fontsize = 16)
+    axs[2].set_ylabel("Smoothed Vel.",fontsize = 16)
+    axs[3].set_ylabel("Smoothed Acc.",fontsize = 16)
     plt.savefig('../Images/Kinematics/' + title+'.png')
+    plt.show()
+    
+    fig, axs = plt.subplots(1,2,figsize = (20, 8))
+    axs[0].plot(mouse_pos.x, mouse_pos.y, color = 'blue')
+    axs[1].plot(mouse_pos.smoothed_position_x, mouse_pos.smoothed_position_y, color = 'blue')
+    axs[0].set_xlabel('Raw Position', fontsize = 12)
+    axs[1].set_xlabel('Smoothed Position', fontsize = 12)
+    for i in range(2):
+        axs[i].set_xlim(100, 1300)
+        axs[i].set_ylim(0, 1150)
+    plt.savefig('../Images/Positions/' + title+'.png')
     plt.show()
 
 def DisplayShortSessions():

@@ -59,11 +59,11 @@ def CompareSession(session, title):
     mouse_pos.filtered_acceleration.plot(ax = axs[2,1])
         
         
-    axs[0,0].set_ylabel('Filtered Pos.')
-    axs[1,0].set_ylabel("Filtered Vel.")
-    axs[2,0].set_ylabel("Filtered Acc.")
-    axs[2,0].set_xlabel('Manual Para.')
-    axs[2,1].set_ylabel("Learned Para.")
+    axs[0,0].set_ylabel('Filtered Pos.',fontsize = 16)
+    axs[1,0].set_ylabel("Filtered Vel.",fontsize = 16)
+    axs[2,0].set_ylabel("Filtered Acc.",fontsize = 16)
+    axs[2,0].set_xlabel('Manual Para.',fontsize = 20)
+    axs[2,1].set_xlabel("Learned Para.",fontsize = 20)
     plt.savefig('../Images/CompareParameters/' + title+'.png')
     plt.show()
     
@@ -93,6 +93,7 @@ def CompareLongSessions():
 
 def main():
     CompareShortSessions()
+    #CompareLongSessions()
 
 
 if __name__ == "__main__":

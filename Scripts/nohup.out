@@ -1645,3 +1645,227 @@ sqrt_diag_V0:
 tensor([-2.2523e-06,  2.7014e-05,  4.0772e-06,  4.9797e-07, -4.4279e-06,
         -5.1900e-06], dtype=torch.float64, requires_grad=True)
 ShortSession11
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:225: UserWarning: The use of `x.T` on tensors of dimension other than 2 to reverse their shape is deprecated and it will throw an error in a future release. Consider `x.mT` to transpose batches of matrices or `x.permute(*torch.arange(x.ndim - 1, -1, -1))` to reverse the dimensions of a tensor. (Triggered internally at ../aten/src/ATen/native/TensorShape.cpp:3614.)
+  innov.T @ Sinv @ innov
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py:359: RuntimeWarning: overflow encountered in matmul
+  logLike = logLike-np.linalg.slogdet(Sn[:, :, k])[1] - innov[:, :, k].T @ Sinv @ innov[:, :, k]
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: overflow encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py:2086: RuntimeWarning: invalid value encountered in slogdet
+  sign, logdet = _umath_linalg.slogdet(a, signature=signature)
+--------------------------------------------------------------------------------
+epoch: 0
+likelihood: -1151121.1435734793
+sigma_a: 
+tensor([10.7724], requires_grad=True)
+sqrt_diag_R: 
+tensor([-0.0109,  0.2744], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([0.1742, 0.0132, 0.0005, 0.1788, 0.0226, 0.0020], dtype=torch.float64,
+       requires_grad=True)
+sqrt_diag_V0: 
+tensor([5.8868e+00, 1.3952e-03, 1.0016e-03, 7.7858e+00, 3.3940e-03, 1.0172e-03],
+       dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 1
+likelihood: -16025.554713860893
+sigma_a: 
+tensor([4.7788], requires_grad=True)
+sqrt_diag_R: 
+tensor([-2.2146e-04,  7.9571e-01], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 3.8940, -0.2440, -0.0416,  5.9549,  0.6353,  0.0827],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([9.2097e+01, 7.7892e-03, 1.0338e-03, 1.0621e+02, 5.7737e-02, 1.4111e-03],
+       dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 2
+likelihood: -11274.361492940567
+sigma_a: 
+tensor([4.7087], requires_grad=True)
+sqrt_diag_R: 
+tensor([-6.6891e-05,  8.0696e-01], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 86.4054, -22.3317,  -0.8526, 134.1016,  17.1700,   1.3514],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([2.0368e+03, 5.3977e-01, 1.5981e-03, 2.3294e+03, 4.2852e-01, 9.9055e-03],
+       dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 3
+likelihood: -11250.905605552474
+sigma_a: 
+tensor([4.7027], requires_grad=True)
+sqrt_diag_R: 
+tensor([5.8317e-04, 8.1046e-01], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 19.0225, -26.8659,  23.5028,  29.5299,  23.0163,  -3.9752],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([ 4.4570e+02, -6.2297e-02,  2.0388e-03,  5.1098e+02, -7.7049e-01,
+        -5.4652e-03], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 4
+likelihood: -11246.667592785589
+sigma_a: 
+tensor([4.7047], requires_grad=True)
+sqrt_diag_R: 
+tensor([1.9086e-04, 8.0880e-01], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 15.8669, -31.4362,  38.7782,  24.8089,  22.9712,  -9.5356],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([ 3.6293e+02, -5.9855e-01,  1.6498e-03,  4.1681e+02,  1.1315e+00,
+        -5.2930e-03], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 5
+likelihood: -11246.01125326603
+sigma_a: 
+tensor([4.7256], requires_grad=True)
+sqrt_diag_R: 
+tensor([-0.0009,  0.8007], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([ 76.2036, -35.3312,  59.2727, 149.5014,  22.8817, -10.7750],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([ 2.3985e+02, -1.2195e+00,  2.5694e-01,  3.2089e+02,  9.8738e-01,
+        -9.0143e-01], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 6
+likelihood: -11245.526823322962
+sigma_a: 
+tensor([4.7271], requires_grad=True)
+sqrt_diag_R: 
+tensor([-0.0009,  0.8003], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([201.4618, -33.9484,  54.7285, 408.1949,  26.0310, -24.4555],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([-4.4388e-02, -1.6957e+00,  6.4167e-01,  1.3847e+02,  1.4256e+00,
+        -2.2495e+00], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 7
+likelihood: -11238.092152511981
+sigma_a: 
+tensor([4.7086], requires_grad=True)
+sqrt_diag_R: 
+tensor([-1.4965e-04,  8.0672e-01], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([201.3769, -32.5625,  45.5732, 409.9763,  23.2904, -12.6901],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([-1.9992e-03,  2.9793e-01,  5.3799e-01,  1.3875e+02,  7.0424e-02,
+        -1.9011e+00], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 8
+likelihood: -11237.678108744389
+sigma_a: 
+tensor([4.7089], requires_grad=True)
+sqrt_diag_R: 
+tensor([-1.1438e-04,  8.0676e-01], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([201.3723, -32.5925,  45.6464, 515.1559,  23.4104, -12.9510],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([-3.1372e-03,  2.5030e-01,  1.1158e+00,  1.4293e+02,  3.4006e-02,
+        -2.2970e+00], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 9
+likelihood: -11237.36473848817
+sigma_a: 
+tensor([4.7067], requires_grad=True)
+sqrt_diag_R: 
+tensor([-0.0013,  0.8024], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([201.3878, -32.6139,  44.7172, 489.0964,  21.7441, -13.7002],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([-1.2842e-02,  5.5906e-01, -5.5878e+00,  3.2882e+01, -1.1468e+00,
+        -7.8429e+00], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 10
+likelihood: -11236.847038775033
+sigma_a: 
+tensor([4.6915], requires_grad=True)
+sqrt_diag_R: 
+tensor([0.0010, 0.8132], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([201.3786, -29.3971,  44.0069, 525.8072,  24.3474, -10.7862],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([-9.8609e-03,  9.3321e-01, -1.0282e+01, -2.2067e-02,  4.5509e+00,
+        -1.4205e+00], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 11
+likelihood: -11232.783789260317
+sigma_a: 
+tensor([4.7082], requires_grad=True)
+sqrt_diag_R: 
+tensor([-3.3923e-04,  8.0625e-01], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([201.3625, -33.5092,  47.0148, 525.7560,  23.7939, -13.9757],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([-6.1114e-03,  1.5861e-02, -6.7945e+00, -5.7475e-02,  6.0870e-02,
+        -4.9272e+00], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 12
+likelihood: -11232.175607794077
+sigma_a: 
+tensor([4.7073], requires_grad=True)
+sqrt_diag_R: 
+tensor([-2.1340e-09,  8.0736e-01], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([201.3753, -33.0112,  46.1864, 525.8042,  23.7195, -13.2597],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([-2.5734e-07,  1.5463e-05,  1.6078e-05, -7.8949e-08,  9.4626e-07,
+         2.3880e-05], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 13
+likelihood: -11232.043230325819
+sigma_a: 
+tensor([4.7073], requires_grad=True)
+sqrt_diag_R: 
+tensor([-2.1340e-09,  8.0736e-01], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([201.3753, -33.0112,  46.1864, 525.8042,  23.7195, -13.2597],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([-2.5734e-07,  1.5463e-05,  1.6078e-05, -7.8949e-08,  9.4626e-07,
+         2.3880e-05], dtype=torch.float64, requires_grad=True)
+--------------------------------------------------------------------------------
+epoch: 14
+likelihood: -11232.043230325819
+sigma_a: 
+tensor([4.7073], requires_grad=True)
+sqrt_diag_R: 
+tensor([-2.1340e-09,  8.0736e-01], dtype=torch.float64, requires_grad=True)
+m0: 
+tensor([201.3753, -33.0112,  46.1864, 525.8042,  23.7195, -13.2597],
+       dtype=torch.float64, requires_grad=True)
+sqrt_diag_V0: 
+tensor([-2.5734e-07,  1.5463e-05,  1.6078e-05, -7.8949e-08,  9.4626e-07,
+         2.3880e-05], dtype=torch.float64, requires_grad=True)
+Traceback (most recent call last):
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 97, in <module>
+    main()
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 92, in main
+    ProcessShortSessions(param = 'Learnt')
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 77, in ProcessShortSessions
+    ProcessSession(session, title, param = param)
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Scripts/Kinematics_Process.py", line 68, in ProcessSession
+    smoothRes = inference.smoothLDS_SS( 
+  File "/nfs/nhome/live/zimol/ProjectAeon/aeon_mecha/Functions/inference.py", line 408, in smoothLDS_SS
+    Jn[:, :, n-1] = Vnn[:, :, n-1] @ B.T @ np.linalg.inv(Vnn1[:, :, n])
+  File "<__array_function__ internals>", line 180, in inv
+  File "/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py", line 545, in inv
+    ainv = _umath_linalg.inv(a, signature=signature, extobj=extobj)
+  File "/nfs/nhome/live/zimol/anaconda3/envs/lds/lib/python3.9/site-packages/numpy/linalg/linalg.py", line 88, in _raise_linalgerror_singular
+    raise LinAlgError("Singular matrix")
+numpy.linalg.LinAlgError: Singular matrix
