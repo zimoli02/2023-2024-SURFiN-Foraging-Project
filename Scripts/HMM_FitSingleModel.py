@@ -56,7 +56,7 @@ def FitModelsShort(hmm, index, n=5):
     for session, j in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
         title = 'ShortSession'+str(j)
         
-        mouse_pos = pd.read_parquet('../Data/MousePos' + title + 'mousepos.parquet', engine='pyarrow')
+        mouse_pos = pd.read_parquet('../Data/MousePos/' + title + 'mousepos.parquet', engine='pyarrow')
     
         obs = np.array(mouse_pos[feature])
         states = hmm.most_likely_states(obs)
@@ -92,6 +92,7 @@ def FitModelsShort(hmm, index, n=5):
             axs[i].set_xlabel('X')
             axs[i].set_ylabel('Y')
         plt.savefig('../Images/HMM_Heatmap/' + title+'.png')
+        plt.show()
 
 
     fig, axs = plt.subplots(2, N, figsize = (N*8-2,14))
@@ -110,6 +111,7 @@ def FitModelsShort(hmm, index, n=5):
         axs[1,i].set_xlabel('X')
         axs[0,i].set_title('State' + str(i))    
     plt.savefig('../Images/HMM_Heatmap/ShortUnit.png')
+    plt.show()
 
     # Speed, Acceleration, Visits in Patch 1, Visits in Patch 2
     fig, axs = plt.subplots(4, 1, figsize = (10, 4*7-1))
@@ -122,6 +124,7 @@ def FitModelsShort(hmm, index, n=5):
         axs[i].set_xticks(range(0, N), [str(i) for i in range(N)])
         axs[i].set_ylabel(FEATURE[i])
     plt.savefig('../Images/HMM_Data/ShortDataUnit.png')
+    plt.show()
 
 def LongSessionModel(id = 1, n = 8):
     N = n
@@ -256,8 +259,8 @@ def main():
     hmm, index = ShortSessionModel()
     FitModelsShort(hmm, index)
     
-    hmm, index = LongSessionModel()
-    FitModelsLong(hmm, index)
+    #hmm, index = LongSessionModel()
+    #FitModelsLong(hmm, index)
     
     
     

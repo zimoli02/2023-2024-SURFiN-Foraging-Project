@@ -37,6 +37,8 @@ Each session outputs an array of states saved in .npy file.
 Display the inferred states of each session by the unified model. The upper panel is the states in time resolution of
 0.2 seconds, and the lower panel is the most-probable state in 10 seconds.
 [Code](/Scripts/HMM_States.py) 
+![Example for Short Session 0](../Images/HMM_States/ShortSession0.png) 
+*The original and down-sampled states of mouse.*
 
 ### Display Transition Matrix over Time in Long Sessions
 Display the change fo transition matrices over time in long sessions. 

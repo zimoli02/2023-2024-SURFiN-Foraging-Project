@@ -37,7 +37,7 @@ def main():
             
         start, end = mouse_pos.index[0], mouse_pos.index[-1]
                 
-        patch.AddKinematics(title, mouse_pos)
+        kinematics.AddKinematics(title, mouse_pos)
         mouse_pos = mouse_pos[mouse_pos['smoothed_speed'] <= 2000]
         mouse_pos = mouse_pos[mouse_pos['smoothed_acceleration'] <= 60000]
     
@@ -48,7 +48,8 @@ def main():
         patch.InPatch(mouse_pos, r = 30, interval = 5)
         
         mouse_pos = HMM.DeleteRows(mouse_pos, row = 5)
-        mouse_pos.to_parquet('../Data/MousePos' + title + 'mousepos.parquet', engine='pyarrow')
+        mouse_pos.to_parquet('../Data/MousePos/' + title + 'mousepos.parquet', engine='pyarrow')
+        print(title)
     
     
     

@@ -76,7 +76,7 @@ def PlotStates(mouse_pos, states, title, n):
 
     fig, axs = plt.subplots(2, 1, figsize=(35, 8))
     cax, axs[0] = PlotStatesWithTime(states, mouse_pos, type = 'States', N=5, axs = axs[0])
-    cax, axs[1] = PlotStatesWithTime(np.array(states_), states_prob, type = 'States Prob.', N=5, ax = axs[1])
+    cax, axs[1] = PlotStatesWithTime(np.array(states_), states_prob, type = 'States Prob.', N=5, axs = axs[1])
         
     cbar = fig.colorbar(cax, ax=axs, orientation='vertical')
     cbar.set_ticks(np.arange(0, N))
@@ -90,11 +90,12 @@ def PlotStatesShort(n=5):
     for session, j in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
         title = 'ShortSession'+str(j)
         
-        mouse_pos = pd.read_parquet('../Data/MousePos' + title + 'mousepos.parquet', engine='pyarrow')
-        states = np.load('../Data/HMMStates'+title+"States_Unit.npy", allow_pickle = True)
+        mouse_pos = pd.read_parquet('../Data/MousePos/MousePos' + title + 'mousepos.parquet', engine='pyarrow')
+        states = np.load('../Data/HMMStates/'+title+"States_Unit.npy", allow_pickle = True)
         mouse_pos['states'] = pd.Series(states, index=mouse_pos.index)
         
         PlotStates(mouse_pos, states, title, n=N)
+        print(title)
 
 
 def PlotStatesLong(n=8):
@@ -126,10 +127,10 @@ def PlotStatesLong(n=8):
         for df in dfs[1:]: mouse_pos = mouse_pos.add(df, fill_value=0)
         
         
-        states = np.load('../Data/HMMStates'+title+"States_Unit.npy", allow_pickle = True)
+        states = np.load('../Data/HMMStates/'+title+"States_Unit.npy", allow_pickle = True)
         mouse_pos['states'] = pd.Series(states, index=mouse_pos.index)
         PlotStates(mouse_pos, states, title, n=N)
-        
+        print(title)
     
 
 def main():
