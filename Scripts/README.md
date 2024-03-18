@@ -52,7 +52,7 @@ in the previous visit to the current/the other patch, time since the previous vi
 [Code](/Scripts/Regression_FeatureProcess.py) 
 
 ### Regression Model Fitting
-Use different types of GLM to fit regression models. 
+Use different types of GLM to fit regression models. Models are cross-validated.
 [Code](/Scripts/Regression_FitModels.py) 
 ![Example for All Short Sessions](../Images/Regression/AllSessionsData/Poisson.png) 
 *The original and predicted wheel moving distance during each visit of all short sessions, fit by GLM-Poisson model.*
