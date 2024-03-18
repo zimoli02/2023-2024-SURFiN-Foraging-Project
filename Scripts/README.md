@@ -11,6 +11,8 @@ and smoothed speed and acceleration is displayed for each session.
 [Code](/Scripts/Kinematics_Display.py) 
 ![Example for Short Session 0](../Images/Kinematics/ShortSession0.png) 
 *The raw and processed mouse kinematics data.*
+![Example for Short Session 0](../Images/Positions/ShortSession0.png) 
+*The raw and processed mouse position data.*
 
 ### Compare Filtering for Manual/Learned Parameters
 Compare the filtering results (positions, speed, acceleration)
