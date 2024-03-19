@@ -1,9 +1,12 @@
 # Scripts for Data Analysis Involved in the Project
 ## Kinematics Data Processing
+### Learn Parameters for LDS
+[Code](/Scripts/Kinematics_Parameters.py) 
+
 ### LDS
 Use either manually setted or learnt parameters from the first minute of the mouse foraging data. 
 Apply filtering and smoothing functions to the data. 
-[Code](/Scripts/Kinematics_Process.py) 
+[Code](/Scripts/Kinematics_LDS.py) 
 
 ### Display Smoothed Data
 The raw position (x and y), smoothed position (x and y)
