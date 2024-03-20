@@ -403,14 +403,22 @@ def smoothLDS_SS(B, xnn, Vnn, xnn1, Vnn1, m0, V0):
 
     xnN[:, :, -1] = xnn[:, :, -1]
     VnN[:, :, -1] = Vnn[:, :, -1]
-
+    
+    epsilon = 1e-5  # Small regularization term
     for n in reversed(range(1, N)):
-        Jn[:, :, n-1] = Vnn[:, :, n-1] @ B.T @ np.linalg.inv(Vnn1[:, :, n])
+        try:
+            Jn[:, :, n-1] = Vnn[:, :, n-1] @ B.T @ np.linalg.inv(Vnn1[:, :, n])
+        except np.linalg.LinAlgError:
+            Vnn1_reg = Vnn1[:, :, n] + epsilon * np.eye(Vnn1.shape[1])
+            Jn[:, :, n-1] = Vnn[:, :, n-1] @ B.T @ np.linalg.inv(Vnn1_reg)
         xnN[:, :, n-1] = xnn[:, :, n-1] + Jn[:, :, n-1] @ (xnN[:, :, n]-xnn1[:, :, n])
         VnN[:, :, n-1] = Vnn[:, :, n-1] + Jn[:, :, n-1] @ (VnN[:, :, n]-Vnn1[:, :, n]) @ Jn[:, :, n-1].T
     
     # initial state x00 and V00
     # return the smooth estimates of the state at time 0: x0N and V0N
+    Vnn1_reg = Vnn1[:, :, n] + epsilon * np.eye(Vnn1.shape[1])  # Assuming Vnn1 is square
+    Jn[:, :, n-1] = Vnn[:, :, n-1] @ B.T @ np.linalg.inv(Vnn1_reg)
+
     J0 = V0 @ B.T @ np.linalg.inv(Vnn1[:, :, 0])
     x0N = np.expand_dims(m0, 1) + J0 @ (xnN[:, :, 0] - xnn1[:, :, 0])
     V0N = V0 + J0 @ (VnN[:, :, 0] - Vnn1[:, :, 0]) @ J0.T

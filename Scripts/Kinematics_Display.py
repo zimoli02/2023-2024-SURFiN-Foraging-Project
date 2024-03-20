@@ -31,7 +31,7 @@ def Display(session, title):
     start, end = session.enter, session.exit
     mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
         
-    mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, fix_nan=False, fix_nest=False)
+    mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=False, fix_nan=False, fix_nest=False)
         
     # Add smoothed kinematics data to mouse_pos
     kinematics.AddKinematics(title, mouse_pos)
@@ -67,6 +67,7 @@ def Display(session, title):
 
 def DisplayShortSessions():
     for session, count in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
+        if count != 7: continue
         title = 'ShortSession'+str(count)
         Display(session, title)
         print(title)

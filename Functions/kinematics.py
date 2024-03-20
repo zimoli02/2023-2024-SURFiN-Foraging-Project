@@ -34,23 +34,33 @@ def WallError(last_positions, next_positions):
     if abs(last_x - next_x) <= 5 and abs(last_y - next_y) <= 5 : return True
     else: return False
 
-def FixNan(mouse_pos, interval = 3):
-    # Long 
+
+def FixNan(mouse_pos):
     df = mouse_pos.copy()
     nan_blocks = df['x'].isna()
-    for group, data in df[nan_blocks].groupby((nan_blocks != nan_blocks.shift()).cumsum()):
-        duration = data.index[-1] - data.index[0]
-        if duration.total_seconds() >= interval:
-            latest_valid_index = df.loc[:data.index[0], 'x'].last_valid_index()
-            latest_valid_values = df.loc[latest_valid_index, ['x', 'y']].values
+
+    for group, data in mouse_pos[nan_blocks].groupby((nan_blocks != nan_blocks.shift()).cumsum()):
+        duration = (data.index[-1] - data.index[0]).total_seconds()
             
-            next_valid_index = df.loc[data.index[-1] + pd.Timedelta('0.021S'):].first_valid_index()
-            next_valid_values = df.loc[next_valid_index, ['x', 'y']].values
+        latest_valid_index = mouse_pos.loc[:data.index[0]-pd.Timedelta('0.018S'), 'x'].last_valid_index()
+        latest_valid_values = mouse_pos.loc[latest_valid_index, ['x', 'y']].values
+        
+        if len(data) == 1:
+            df.loc[data.index, 'x'] = latest_valid_values[0]
+            df.loc[data.index, 'y'] = latest_valid_values[1]
             
-            if NestError(latest_valid_values,next_valid_values):
-                df.loc[data.index, ['x', 'y']] = np.tile(latest_valid_values, (len(data.index), 1))
-            elif WallError(latest_valid_values,next_valid_values):
-                df.loc[data.index, ['x', 'y']] = np.tile(latest_valid_values, (len(data.index), 1))
+        else:    
+            next_valid_index = mouse_pos.loc[data.index[-1]+pd.Timedelta('0.018S'):].first_valid_index()
+            next_valid_values = mouse_pos.loc[next_valid_index, ['x', 'y']].values
+                
+            interpolated_times = (data.index - latest_valid_index).total_seconds() / duration
+                        
+            total_x = next_valid_values[0] - latest_valid_values[0]
+            total_y = next_valid_values[1] - latest_valid_values[1]
+                        
+            df.loc[data.index, 'x'] = latest_valid_values[0] + interpolated_times * total_x
+            df.loc[data.index, 'y'] = latest_valid_values[1] + interpolated_times * total_y
+    
     return df
 
 def FixNestError(mouse_pos, nest_upper = 575, nest_lower = 475):
@@ -151,15 +161,15 @@ def ExcludeMaintenanceData(
     return filtered_data
 
 
-def ProcessRawData(mouse_pos, root, start, end):
-    mouse_pos = ExcludeMaintenanceData(mouse_pos, GetExperimentTimes(root, start, end))
+def ProcessRawData(mouse_pos, root, start, end, exclude_maintenance = True, fix_nan = True, fix_nest = True):
+    if exclude_maintenance: mouse_pos = ExcludeMaintenanceData(mouse_pos, GetExperimentTimes(root, start, end))
     
     temp_df = mouse_pos.dropna(subset=['x', 'y'])
     first_valid_index, last_valid_index = temp_df.index[0], temp_df.index[-1]
     mouse_pos = mouse_pos.loc[first_valid_index:last_valid_index]
     
-    mouse_pos = FixNan(mouse_pos)
-    mouse_pos = FixNestError(mouse_pos)
+    if fix_nan: mouse_pos = FixNan(mouse_pos)
+    if fix_nest: mouse_pos = FixNestError(mouse_pos)
     
     return mouse_pos
     

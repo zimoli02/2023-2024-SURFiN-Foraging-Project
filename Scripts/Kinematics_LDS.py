@@ -34,7 +34,7 @@ def ProcessSession(session, title, param):
     start, end = session.enter, session.exit
     mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
         
-    mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end)
+    mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=False)
 
     obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())
     
@@ -61,6 +61,7 @@ def ProcessSession(session, title, param):
     
 def ProcessShortSessions(param):
     for session, count in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
+        if count != 7: continue
         title = 'ShortSession'+str(count)
         ProcessSession(session, title, param = param)
         print(title)
