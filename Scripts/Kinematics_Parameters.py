@@ -78,7 +78,7 @@ def main():
     np.savez('../Data/MouseKinematicParameters/ManualParameters.npz', sigma_a = sigma_a, sigma_x = sigma_x, sigma_y = sigma_y, sqrt_diag_V0_value = sqrt_diag_V0_value, B = B, Qe = Qe, m0 = m0, V0 = V0, Z = Z, R = R)
     
         
-    ProcessShortSessions()
+    #ProcessShortSessions()
     ProcessLongSessions()
         
 

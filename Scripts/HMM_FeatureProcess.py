@@ -20,6 +20,7 @@ import Functions.HMM as HMM
 import Functions.kinematics as kinematics
 import Functions.patch as patch
 
+
 def main():
     root = [Path("/ceph/aeon/aeon/data/raw/AEON2/experiment0.2")]
 
@@ -30,16 +31,19 @@ def main():
     
     for session, i in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
         title = 'ShortSession'+str(i)
+        print(title)
                     
         start, end = session.enter, session.exit
         mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
-        mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end)
+        
+        if i == 7: mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=False)
+        else: mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end)
             
         start, end = mouse_pos.index[0], mouse_pos.index[-1]
                 
         kinematics.AddKinematics(title, mouse_pos)
-        mouse_pos = mouse_pos[mouse_pos['smoothed_speed'] <= 2000]
-        mouse_pos = mouse_pos[mouse_pos['smoothed_acceleration'] <= 60000]
+        #mouse_pos = mouse_pos[mouse_pos['smoothed_speed'] <= 2000]
+        #mouse_pos = mouse_pos[mouse_pos['smoothed_acceleration'] <= 60000]
     
             
         weight = api.load(root, exp02.Nest.WeightSubject, start=start, end=end)

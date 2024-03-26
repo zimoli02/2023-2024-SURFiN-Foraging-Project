@@ -131,8 +131,10 @@ def FitModelsLong(n=8):
 
         dfs = []
         for mouse_pos_sub in mouse_pos_subs:
+            '''
             mouse_pos_sub = mouse_pos_sub[mouse_pos_sub['smoothed_speed'] <= 2000]
             mouse_pos_sub = mouse_pos_sub[mouse_pos_sub['smoothed_acceleration'] <= 60000]
+            '''
             mouse_pos_sub = HMM.DeleteRows(mouse_pos_sub)
                 
             start, end = mouse_pos_sub.index[0], mouse_pos_sub.index[-1]

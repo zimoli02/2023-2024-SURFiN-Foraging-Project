@@ -30,8 +30,9 @@ long_sessions = sessions.iloc[[8, 10, 11, 14]]
 def CompareSession(session, title):
     start, end = session.enter, session.exit
     mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
-        
-    mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end)
+    
+    if title == 'ShortSession7': mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=False)
+    else: mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end)
     obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())
         
     fig, axs = plt.subplots(3,2, figsize = (50,24))
@@ -62,6 +63,7 @@ def CompareSession(session, title):
     axs[0,0].set_ylabel('Filtered Pos.',fontsize = 16)
     axs[1,0].set_ylabel("Filtered Vel.",fontsize = 16)
     axs[2,0].set_ylabel("Filtered Acc.",fontsize = 16)
+    
     axs[2,0].set_xlabel('Manual Para.',fontsize = 20)
     axs[2,1].set_xlabel("Learned Para.",fontsize = 20)
     plt.savefig('../Images/CompareParameters/' + title+'.png')
