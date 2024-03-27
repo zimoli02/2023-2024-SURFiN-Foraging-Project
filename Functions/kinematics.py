@@ -217,19 +217,21 @@ def LDSParameters_Manual(dt):
 
 
 def LDSParameters_Learned(y, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z, dt = 0.02):
+    '''   
     pos_x0, pos_y0 = y[0,0], y[1,0]
     vel_x0, vel_y0 = (y[0,1] - y[0,0])/dt, (y[1,1] - y[1,0])/dt
     acc_x0, acc_y0 = (y[0,2] - y[0,0])/(dt**2), (y[1,2] - y[1,0])/(dt**2)
+    '''
     
     # Learning Parameters
-    lbfgs_max_iter = 20
-    lbfgs_tolerance_grad = 1e-7
-    lbfgs_tolerance_change = 1e-9
+    lbfgs_max_iter = 2
+    lbfgs_tolerance_grad = 1e-3
+    lbfgs_tolerance_change = 1e-3
     lbfgs_lr = 1.0
     lbfgs_n_epochs = 100
-    lbfgs_tol = 1e-6
+    lbfgs_tol = 1e-3
     
-    Qe_reg_param_learned = 1e-2
+    Qe_reg_param_learned = 1e-10
     sqrt_diag_R_torch = torch.DoubleTensor([sigma_x, sigma_y])
     m0_torch = torch.from_numpy(m0.copy())
     sqrt_diag_V0_torch = torch.DoubleTensor([sqrt_diag_V0_value
