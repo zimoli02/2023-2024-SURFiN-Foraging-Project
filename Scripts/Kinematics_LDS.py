@@ -19,6 +19,7 @@ from aeon.analysis.utils import visits
 
 import Functions.inference as inference
 import Functions.kinematics as kinematics
+import Functions.patch as patch
 
 
 root = [Path("/ceph/aeon/aeon/data/raw/AEON2/experiment0.2")]
@@ -33,8 +34,21 @@ def ProcessSession(session, title, param):
     
     start, end = session.enter, session.exit
     mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
-        
-    mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=False)
+    
+    if title == 'ShortSession7': maintenance = False
+    else: maintenance = True
+    
+    if title[:12] == 'ShortSession':
+        mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=maintenance)
+    else:
+        mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=maintenance, fix_nan=False, fix_nest=False)
+        mouse_pos_subs = patch.SeparateDF(mouse_pos)
+        dfs = []
+        for mouse_pos_sub in mouse_pos_subs:      
+            mouse_pos_sub = kinematics.FixNan(mouse_pos_sub)
+            dfs.append(mouse_pos_sub)
+        mouse_pos = dfs[0]
+        for df in dfs[1:]: mouse_pos = mouse_pos.add(df, fill_value=0)
 
     obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())
     
@@ -61,21 +75,21 @@ def ProcessSession(session, title, param):
     
 def ProcessShortSessions(param):
     for session, count in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
-        if count != 7: continue
         title = 'ShortSession'+str(count)
         ProcessSession(session, title, param = param)
         print(title)
 
 def ProcessLongSessions(param):
     for session, count in zip(list(long_sessions.itertuples()), range(len(long_sessions))):
+        if count < 2 : continue
         title = 'LongSession'+str(count)
         ProcessSession(session, title, param = param)
         print(title)
         
 def main():
         
-    ProcessShortSessions(param = 'Learned')
-    #ProcessLongSessions()
+    #ProcessShortSessions(param = 'Learned')
+    ProcessLongSessions(param = 'Learned')
         
 
 if __name__ == "__main__":

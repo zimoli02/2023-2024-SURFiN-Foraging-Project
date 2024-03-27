@@ -34,7 +34,7 @@ def ShortSessionModel(id = 7, n=5):
     N = n
     
     title = 'ShortSession'+str(id)  
-    mouse_pos = pd.read_parquet('../Data/MousePos' + title + 'mousepos.parquet', engine='pyarrow')
+    mouse_pos = pd.read_parquet('../Data/MousePos/' + title + 'mousepos.parquet', engine='pyarrow')
     
     obs = np.array(mouse_pos[feature])
     hmm, states, transition_mat, lls = HMM.FitHMM(obs, num_states = N, n_iters = 50)

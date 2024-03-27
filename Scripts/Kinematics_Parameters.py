@@ -24,6 +24,8 @@ import Functions.kinematics as kinematics
 root = [Path("/ceph/aeon/aeon/data/raw/AEON2/experiment0.2")]
 subject_events = api.load(root, exp02.ExperimentalMetadata.SubjectState)
 sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
+print("Total rows:", len(sessions))
+
 short_sessions = sessions.iloc[[4,16,17,20,23,24,25,26,28,29,30,31]]
 long_sessions = sessions.iloc[[8, 10, 11, 14]]
 
@@ -43,22 +45,29 @@ def ProcessSession(session, title, param):
         P = np.load('../Data/MouseKinematicParameters/' + title + 'Parameters.npz', allow_pickle=True)
     except FileNotFoundError:
         start, end = session.enter, session.exit
+        if title == 'ShortSession7': maintenance = False
+        else: maintenance = True
         
         mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
-            
-        mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end)
-
-        obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())
+        print('mouse_pos')
         
+        mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=maintenance, fix_nan=False, fix_nest=False)
+        print('pre_process')
+        
+        mouse_pos = kinematics.FixNan(mouse_pos[start:start+pd.Timedelta('2H')])
+        print('fix_nan')
+        
+        obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())
+        print('obs')
         
         P = np.load('../Data/MouseKinematicParameters/ManualParameters.npz', allow_pickle=True)
         sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, V0, Z, R = P['sigma_a'].item(), P['sigma_x'].item(), P['sigma_y'].item(), P['sqrt_diag_V0_value'].item(), P['B'], P['Qe'], P['m0'], P['V0'], P['Z'], P['R']
-        
+        print('P')
 
-        #obs_valid = FindValidData(obs)
+        #First 10 min of the data
         sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, m0, V0, Z, R = kinematics.LDSParameters_Learned(obs[:, :10*60*50], sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z)
         np.savez('../Data/MouseKinematicParameters/' + title + 'Parameters.npz', sigma_a = sigma_a, sigma_x = sigma_x, sigma_y = sigma_y, sqrt_diag_V0_value = sqrt_diag_V0_value, B = B, Qe = Qe, m0 = m0, V0 = V0, Z = Z, R = R)
-
+        print('parameters')
     
 def ProcessShortSessions(param = 'Learned'):
     for session, count in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
@@ -68,6 +77,7 @@ def ProcessShortSessions(param = 'Learned'):
 
 def ProcessLongSessions(param = 'Learned'):
     for session, count in zip(list(long_sessions.itertuples()), range(len(long_sessions))):
+        if count != 3: continue
         title = 'LongSession'+str(count)
         ProcessSession(session, title, param = param)
         print(title)
@@ -76,7 +86,8 @@ def main():
     
     sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, V0, Z, R = kinematics.LDSParameters_Manual(dt=0.02)
     np.savez('../Data/MouseKinematicParameters/ManualParameters.npz', sigma_a = sigma_a, sigma_x = sigma_x, sigma_y = sigma_y, sqrt_diag_V0_value = sqrt_diag_V0_value, B = B, Qe = Qe, m0 = m0, V0 = V0, Z = Z, R = R)
-    
+
+
         
     #ProcessShortSessions()
     ProcessLongSessions()
