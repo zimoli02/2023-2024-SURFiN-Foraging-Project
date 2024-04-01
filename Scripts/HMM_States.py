@@ -90,7 +90,7 @@ def PlotStatesShort(n=5):
     for session, j in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
         title = 'ShortSession'+str(j)
         
-        mouse_pos = pd.read_parquet('../Data/MousePos/MousePos' + title + 'mousepos.parquet', engine='pyarrow')
+        mouse_pos = pd.read_parquet('../Data/MousePos/' + title + 'mousepos.parquet', engine='pyarrow')
         states = np.load('../Data/HMMStates/'+title+"States_Unit.npy", allow_pickle = True)
         mouse_pos['states'] = pd.Series(states, index=mouse_pos.index)
         
@@ -135,7 +135,7 @@ def PlotStatesLong(n=8):
 
 def main():
     PlotStatesShort()
-    PlotStatesLong()
+    #PlotStatesLong()
     
 
 if __name__ == "__main__":

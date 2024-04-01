@@ -28,11 +28,15 @@ short_sessions = sessions.iloc[[4,16,17,20,23,24,25,26,28,29,30,31]]
 long_sessions = sessions.iloc[[8, 10, 11, 14]]
 
 def CompareSession(session, title):
-    start, end = session.enter, session.exit
-    mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
+    try:
+        mouse_pos = pd.read_parquet('../Data/RawMouseKinematics/' + title + 'mousepos.parquet', engine='pyarrow')
+    except FileNotFoundError:   
+        start, end = session.enter, session.exit
+        mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
+        
+        if title == 'ShortSession7': mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=False)
+        else: mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end)
     
-    if title == 'ShortSession7': mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=False)
-    else: mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end)
     obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())
         
     fig, axs = plt.subplots(3,2, figsize = (50,24))

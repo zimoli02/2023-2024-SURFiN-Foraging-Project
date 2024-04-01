@@ -32,19 +32,19 @@ def main():
     for session, i in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
         title = 'ShortSession'+str(i)
         print(title)
-                    
-        start, end = session.enter, session.exit
-        mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
         
-        if i == 7: mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=False)
-        else: mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end)
+        try:
+            mouse_pos = pd.read_parquet('../Data/RawMouseKinematics/' + title + 'mousepos.parquet', engine='pyarrow')
+        except FileNotFoundError:   
+            start, end = session.enter, session.exit
+            mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
+            
+            if i == 7: mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=False)
+            else: mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end)
             
         start, end = mouse_pos.index[0], mouse_pos.index[-1]
                 
-        kinematics.AddKinematics(title, mouse_pos)
-        #mouse_pos = mouse_pos[mouse_pos['smoothed_speed'] <= 2000]
-        #mouse_pos = mouse_pos[mouse_pos['smoothed_acceleration'] <= 60000]
-    
+        kinematics.AddKinematics(title, mouse_pos)    
             
         weight = api.load(root, exp02.Nest.WeightSubject, start=start, end=end)
         patch.AddWeight(mouse_pos, weight)
