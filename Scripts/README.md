@@ -3,19 +3,21 @@
 ### Learn Parameters for LDS
 [Code](/Scripts/Kinematics_Parameters.py) 
 
-### LDS
+### Perform LDS
 Use either manually setted or learnt parameters from the first minute of the mouse foraging data. 
 Apply filtering and smoothing functions to the data. 
 [Code](/Scripts/Kinematics_LDS.py) 
 
 ### Display Smoothed Data
 The raw position (x and y), smoothed position (x and y)
-and smoothed speed and acceleration is displayed for each session. 
+and smoothed speed and acceleration are displayed for each session. 
 [Code](/Scripts/Kinematics_Display.py) 
 ![Example for Short Session 0](../Images/Kinematics/ShortSession0.png) 
 *The raw and processed mouse kinematics data.*
 ![Example for Short Session 0](../Images/Positions/ShortSession0.png) 
 *The raw and processed mouse position data.*
+![Example for Short Session 0](../Figures/LDS.png) 
+*A detailed example of the raw and processed (smoothed) mouse position data.*
 
 ### Compare Filtering for Manual/Learned Parameters
 Compare the filtering results (positions, speed, acceleration)
@@ -30,6 +32,13 @@ Get the kinematics data and weight of the mouse in each session. Compute whether
 in/out of the two patches based on position data. Each session outputs a dataframe with rows of time index
 and columns of position/speed/acceleration/weight/patch etc. that is saved as a .parquet file. 
 [Code](/Scripts/HMM_FeatureProcess.py) 
+
+### HMM Model: Determine the Appropriate State Number
+Determine the number of states to fit in the GLM-HMM model.
+Each short session is used to fit a GLM-HMM model with state number range from 3 to 10. Each model is then used to infer the states of the other short sessions that are concatenated into a complete test session. The loglikelihood of each inference is recorded.
+[Code](/Scripts/HMM_FindSingleModel.py) 
+![Loglikelihood of Models](../Images/HMM_StateChoice/Summary.png) 
+*The summary of the model performances fitted from the 12 short sessions.*
 
 ### HMM Model Fitting
 Use GLM-HMM model to infer the states of mouse during each session.
@@ -61,3 +70,5 @@ Use different types of GLM to fit regression models. Models are cross-validated.
 [Code](/Scripts/Regression_FitModels.py) 
 ![Example for All Short Sessions](../Images/Regression/AllSessionsData/Poisson.png) 
 *The original and predicted wheel moving distance during each visit of all short sessions, fit by GLM-Poisson model.*
+![Example for All Short Sessions](../Images/Regression/AllSessionsData/Gaussian.png) 
+*The original and predicted wheel moving distance during each visit of all short sessions, fit by GLM-Gaussian model.*
