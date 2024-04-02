@@ -26,7 +26,7 @@ def main():
 
     subject_events = api.load(root, exp02.ExperimentalMetadata.SubjectState)
     sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
-    short_sessions = sessions.iloc[[4,16,17,20,23,24,25,26,28,29,30,31]]
+    short_sessions = sessions.iloc[[4,16,17,20,23,24,25,28,29,30,31]]
     long_sessions = sessions.iloc[[8, 10, 11, 14]]
     
     for session, i in zip(list(short_sessions.itertuples()), range(len(short_sessions))):

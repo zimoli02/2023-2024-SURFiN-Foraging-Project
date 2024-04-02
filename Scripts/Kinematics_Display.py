@@ -24,16 +24,14 @@ root = [Path("/ceph/aeon/aeon/data/raw/AEON2/experiment0.2")]
 
 subject_events = api.load(root, exp02.ExperimentalMetadata.SubjectState)
 sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
-short_sessions = sessions.iloc[[4,16,17,20,23,24,25,26,28,29,30,31]]
+short_sessions = sessions.iloc[[4,16,17,20,23,24,25,28,29,30,31]]
 long_sessions = sessions.iloc[[8, 10, 11, 14]]
 
 def Display(session, title):
     start, end = session.enter, session.exit
     mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
     
-    if title == 'ShortSession7': maintenance = False
-    else: maintenance = True
-    mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=maintenance, fix_nan=False, fix_nest=False)
+    mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=True, fix_nan=False, fix_nest=False)
         
     # Add smoothed kinematics data to mouse_pos
     kinematics.AddKinematics(title, mouse_pos)

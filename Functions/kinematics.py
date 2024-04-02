@@ -40,8 +40,6 @@ def FixNan(mouse_pos):
     nan_blocks = df['x'].isna()
 
     for group, data in mouse_pos[nan_blocks].groupby((nan_blocks != nan_blocks.shift()).cumsum()):
-        duration = (data.index[-1] - data.index[0]).total_seconds()
-            
         latest_valid_index = mouse_pos.loc[:data.index[0]-pd.Timedelta('0.018S'), 'x'].last_valid_index()
         latest_valid_values = mouse_pos.loc[latest_valid_index, ['x', 'y']].values
         
@@ -52,7 +50,8 @@ def FixNan(mouse_pos):
         else:    
             next_valid_index = mouse_pos.loc[data.index[-1]+pd.Timedelta('0.018S'):].first_valid_index()
             next_valid_values = mouse_pos.loc[next_valid_index, ['x', 'y']].values
-                
+            
+            duration = (data.index[-1] - latest_valid_index).total_seconds()
             interpolated_times = (data.index - latest_valid_index).total_seconds() / duration
                         
             total_x = next_valid_values[0] - latest_valid_values[0]

@@ -25,7 +25,7 @@ root = [Path("/ceph/aeon/aeon/data/raw/AEON2/experiment0.2")]
 
 subject_events = api.load(root, exp02.ExperimentalMetadata.SubjectState)
 sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
-short_sessions = sessions.iloc[[4,16,17,20,23,24,25,26,28,29,30,31]]
+short_sessions = sessions.iloc[[4,16,17,20,23,24,25,28,29,30,31]]
 long_sessions = sessions.iloc[[8, 10, 11, 14]]
 
 feature = ['weight', 'smoothed_speed', 'smoothed_acceleration']
@@ -213,7 +213,7 @@ def main():
     FitModelsShort()
     
     # For long sessions
-    FitModelsLong()
+    #FitModelsLong()
     
 if __name__ == "__main__":
     main()

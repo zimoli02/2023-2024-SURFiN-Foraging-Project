@@ -24,7 +24,7 @@ root = [Path("/ceph/aeon/aeon/data/raw/AEON2/experiment0.2")]
 
 subject_events = api.load(root, exp02.ExperimentalMetadata.SubjectState)
 sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
-short_sessions = sessions.iloc[[4,16,17,20,23,24,25,26,28,29,30,31]]
+short_sessions = sessions.iloc[[4,16,17,20,23,24,25,28,29,30,31]]
 long_sessions = sessions.iloc[[8, 10, 11, 14]]
 
 def CompareSession(session, title):
@@ -33,9 +33,7 @@ def CompareSession(session, title):
     except FileNotFoundError:   
         start, end = session.enter, session.exit
         mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
-        
-        if title == 'ShortSession7': mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=False)
-        else: mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end)
+        mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end)
     
     obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())
         
@@ -97,8 +95,20 @@ def CompareLongSessions():
     np.save('../Data/MouseKinematicParameters/LongSessions_LL_Manual.npy', LL_Manual)
     np.save('../Data/MouseKinematicParameters/LongSessions_LL_Learned.npy', LL_Learned)
 
+def CompareShortSessionsLikelihood():
+    Manual = np.load('../Data/MouseKinematicParameters/ShortSessions_LL_Manual.npy', allow_pickle=True)
+    Learned = np.load('../Data/MouseKinematicParameters/ShortSessions_LL_Learned.npy', allow_pickle=True)
+    
+    plt.boxplot(np.array([Manual, Learned]).T)
+    plt.xticks([1, 2], ['Manual', 'Learned'])
+    plt.ylabel('Log Likelihood')
+    plt.savefig('../Images/CompareParameters/LogLikelihood.png')
+    plt.show()
+
+
 def main():
-    CompareShortSessions()
+    #CompareShortSessions()
+    CompareShortSessionsLikelihood()
     #CompareLongSessions()
 
 
