@@ -50,9 +50,11 @@ Each session outputs an array of states saved in .npy file.
 [Code for Unified Model Fitting](/Scripts/HMM_FitSingleModel.py) 
 
 ### Display Inferred HMM States
-Display the inferred states of each session by the unified model. The upper panel is the states in time resolution of
+Select a short session as the unified model. Display the inferred states of each session by the unified model. The upper panel is the states in time resolution of
 0.2 seconds, and the lower panel is the most-probable state in 10 seconds.
 [Code](/Scripts/HMM_States.py) 
+![Transition Matrix of the Unified Model](../Images/HMM_TransitionM/ShortModel.png) 
+*The transition matrix of the unified model, fitted from short session 5.*
 ![Example for Short Session 0](../Images/HMM_States/ShortSession0.png) 
 *The original and down-sampled states of mouse.*
 
@@ -69,6 +71,7 @@ in the previous visit to the current/the other patch, time since the previous vi
 
 ### Regression Model Fitting
 Use different types of GLM to fit regression models. Models are cross-validated.
+
 Average Correlation for Poisson Model Fitted:  0.18425183598007913  
 Average Correlation for Gaussian Model Fitted:  0.23243690734816744  
 Average Correlation for Gamma Model Fitted:  0.14093517768873232  
