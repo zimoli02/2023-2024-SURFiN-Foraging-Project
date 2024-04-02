@@ -25,6 +25,8 @@ of either manual or learned parameters.
 [Code](/Scripts/Kinematics_CompareParameters.py) 
 ![Example for Short Session 0](../Images/CompareParameters/ShortSession0.png) 
 *The processed mouse kinematics data of two types of parameters.*
+![Log Likelihood for All Sessions](../Images/CompareParameters/LogLikelihood.png) 
+*The log likelihood (per data point) of filtering, using manual or learned parameters.*
 
 ## HMM Models Based on Kinematics Data: Infer the State of the Mouse
 ### HMM Feature Processing
@@ -67,6 +69,9 @@ in the previous visit to the current/the other patch, time since the previous vi
 
 ### Regression Model Fitting
 Use different types of GLM to fit regression models. Models are cross-validated.
+Average Correlation for Poisson Model Fitted:  0.18425183598007913  
+Average Correlation for Gaussian Model Fitted:  0.23243690734816744  
+Average Correlation for Gamma Model Fitted:  0.14093517768873232  
 [Code](/Scripts/Regression_FitModels.py) 
 ![Example for All Short Sessions](../Images/Regression/AllSessionsData/Poisson.png) 
 *The original and predicted wheel moving distance during each visit of all short sessions, fit by GLM-Poisson model.*
