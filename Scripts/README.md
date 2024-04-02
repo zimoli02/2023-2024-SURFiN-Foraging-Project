@@ -70,3 +70,5 @@ Use different types of GLM to fit regression models. Models are cross-validated.
 [Code](/Scripts/Regression_FitModels.py) 
 ![Example for All Short Sessions](../Images/Regression/AllSessionsData/Poisson.png) 
 *The original and predicted wheel moving distance during each visit of all short sessions, fit by GLM-Poisson model.*
+![Example for All Short Sessions](../Images/Regression/AllSessionsData/Gaussian.png) 
+*The original and predicted wheel moving distance during each visit of all short sessions, fit by GLM-Gaussian model.*
