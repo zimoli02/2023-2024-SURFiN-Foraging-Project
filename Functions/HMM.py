@@ -19,7 +19,7 @@ from SSM.ssm.plots import gradient_cmap, white_to_color_cmap
 sns.set_style("white")
 sns.set_context("talk")
 
-color_names = ["blue","red","yellow", "green","brown"]
+color_names = ["blue","red","tan", "green","brown","purple","orange", "black", 'turquoise']
 colors = sns.xkcd_palette(color_names)
 cmap = gradient_cmap(colors)
 
@@ -34,10 +34,6 @@ def PlotLLS(hmm_lls):
 
 
 def PlotStates(hmm_z, mouse_pos, N):
-    color_names = ["blue","red","yellow", "green","brown","purple","orange", "black"]
-    colors = sns.xkcd_palette(color_names[0:N])
-    cmap = gradient_cmap(colors)
-
     times = pd.to_datetime(mouse_pos.index)
     numerical_times = (times - times[0]).total_seconds().values
     states_array = hmm_z.reshape(1, -1)
@@ -62,9 +58,9 @@ def PlotStates(hmm_z, mouse_pos, N):
 
 
 def PlotTransition(transition_mat, title):
-    annot_array = np.array([[round(item, 2) for item in row] for row in transition_mat])
-    fig, axs = plt.subplots(1,1, figsize=(4, 4))
-    sns.heatmap(transition_mat, cmap='YlGnBu', ax = axs, square = 'True', cbar = False, annot=annot_array)
+    annot_array = np.array([[round(item, 3) for item in row] for row in transition_mat])
+    fig, axs = plt.subplots(1,1, figsize=(len(transition_mat)+3, len(transition_mat)+3))
+    sns.heatmap(transition_mat, cmap='binary', ax = axs, square = 'True', cbar = False, annot=annot_array)
     axs.set_title("Learned Transition Matrix") 
     plt.savefig(title)
 

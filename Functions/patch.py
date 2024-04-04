@@ -73,7 +73,7 @@ def AddWeight(mouse_pos, weight):
             recent_weight = weight[weight.index <= idx].iloc[-1]['value']
             mouse_pos.at[idx, 'weight'] = recent_weight
             
-def InPatch_(mouse_pos, pellets_patch1,  pellets_patch2, r = 30, interval = 5):
+def PositionInPatch(mouse_pos, r = 30):
     Patch1, Patch2 = [554,832],[590.25, 256.75]
     
     # Calculate distances
@@ -81,75 +81,11 @@ def InPatch_(mouse_pos, pellets_patch1,  pellets_patch2, r = 30, interval = 5):
     distance2 = np.sqrt((mouse_pos['smoothed_position_x'] - Patch2[0]) ** 2 + (mouse_pos['smoothed_position_y'] - Patch2[1]) ** 2)
     
     # Calssify
-    mouse_pos['Patch1'] = np.where(distance1 < r, 1, 0)
-    mouse_pos['Patch2'] = np.where(distance2 < r, 1, 0)
+    mouse_pos['Patch'] = np.where(distance1 < r, 1, 0) + np.where(distance2 < r, 1, 0)
     
-    # Fix Classification
-    groups = mouse_pos['Patch1'].ne(mouse_pos['Patch1'].shift()).cumsum()
-    zeros_groups = mouse_pos[mouse_pos['Patch1'] == 0].groupby(groups)['Patch1']
-    for name, group in zeros_groups:
-        duration = group.index[-1] - group.index[0]
-        if duration < pd.Timedelta(seconds=interval): mouse_pos.loc[group.index, 'Patch1'] = 1
-        
-    groups = mouse_pos['Patch2'].ne(mouse_pos['Patch2'].shift()).cumsum()
-    zeros_groups = mouse_pos[mouse_pos['Patch2'] == 0].groupby(groups)['Patch2']
-    for name, group in zeros_groups:
-        duration = group.index[-1] - group.index[0]
-        if duration < pd.Timedelta(seconds=interval): mouse_pos.loc[group.index, 'Patch2'] = 1
-
-        
-    # Calculate Visits
-    groups = mouse_pos['Patch1'].ne(mouse_pos['Patch1'].shift()).cumsum()
-    visits = mouse_pos[mouse_pos['Patch1'] == 1].groupby(groups)['Patch1']
-    mouse_pos['Patch1_Visit'] = 0
-    mouse_pos['Patch1_Visit_Time'] = pd.Timedelta(0)
-    mouse_pos['Patch1_Visit_Time_Seconds'] = pd.Timedelta(0)
-    mouse_pos['Patch1_Leave_Time'] = pd.Timedelta(0)
-    mouse_pos['Patch1_Leave_Time_Seconds'] = pd.Timedelta(0)
-    mouse_pos['Patch1_Forage'] = 0
-    visit_number = 0
-    for name, group in visits:
-        visit_number += 1
-        mouse_pos.loc[group.index, 'Patch1_Visit'] = visit_number
-        
-        entry_time = group.index[0]
-        duration = group.index - entry_time
-        mouse_pos.loc[group.index, 'Patch1_Visit_Time'] = duration
-        mouse_pos['Patch1_Visit_Time_Seconds'] = mouse_pos['Patch1_Visit_Time'].dt.total_seconds()
-        
-        leave_time = group.index[-1]
-        duration = leave_time - group.index
-        mouse_pos.loc[group.index, 'Patch1_Leave_Time'] = duration
-        mouse_pos['Patch1_Leave_Time_Seconds'] = mouse_pos['Patch1_Leave_Time'].dt.total_seconds()
-        
-        pellet_events_during_visit = pellets_patch1[(pellets_patch1['event'] == 'TriggerPellet') & (pellets_patch1.index >= entry_time) & (pellets_patch1.index <= leave_time)]
-        if not pellet_events_during_visit.empty: mouse_pos.loc[group.index, 'Patch1_Forage'] = 1
+    return mouse_pos
     
-    groups = mouse_pos['Patch2'].ne(mouse_pos['Patch2'].shift()).cumsum()
-    visits = mouse_pos[mouse_pos['Patch2'] == 1].groupby(groups)['Patch2']
-    mouse_pos['Patch2_Visit'] = 0
-    mouse_pos['Patch2_Visit_Time'] = pd.Timedelta(0)
-    mouse_pos['Patch2_Visit_Time_Seconds'] = pd.Timedelta(0)
-    mouse_pos['Patch2_Leave_Time'] = pd.Timedelta(0)
-    mouse_pos['Patch2_Leave_Time_Seconds'] = pd.Timedelta(0)
-    mouse_pos['Patch2_Forage'] = 0
-    visit_number = 0
-    for name, group in visits:
-        visit_number += 1
-        mouse_pos.loc[group.index, 'Patch2_Visit'] = visit_number
-        
-        entry_time = group.index[0]
-        duration = group.index - entry_time
-        mouse_pos.loc[group.index, 'Patch2_Visit_Time'] = duration
-        mouse_pos['Patch2_Visit_Time_Seconds'] = mouse_pos['Patch2_Visit_Time'].dt.total_seconds()
-        
-        leave_time = group.index[-1]
-        duration = leave_time - group.index
-        mouse_pos.loc[group.index, 'Patch2_Leave_Time'] = duration
-        mouse_pos['Patch2_Leave_Time_Seconds'] = mouse_pos['Patch2_Leave_Time'].dt.total_seconds()
-        
-        pellet_events_during_visit = pellets_patch2[(pellets_patch2['event'] == 'TriggerPellet') & (pellets_patch2.index >= entry_time) & (pellets_patch2.index <= leave_time)]
-        if not pellet_events_during_visit.empty: mouse_pos.loc[group.index, 'Patch2_Forage'] = 1  
+    
         
 def InPatch(mouse_pos, r = 30, interval = 5):
     Patch1, Patch2 = [554,832],[590.25, 256.75]
