@@ -143,17 +143,17 @@ def MoveWheel(start, end, patch = 'Patch1', interval_seconds = 10):
     return encoder
 
 
-def AtGate(mouse_pos, r=5):
-    gate = [1233, 588]
-    distance = np.sqrt((mouse_pos['smoothed_position_x'] - gate[0]) ** 2 + (mouse_pos['smoothed_position_y'] - gate[1]) ** 2)
+def EnterArena(mouse_pos):
+    mouse_pos = PositionInArena(mouse_pos)
+    InArena = mouse_pos.Arena.to_numpy()
 
-    return mouse_pos.iloc[np.where(distance < r)].index
+    return mouse_pos.iloc[np.where(InArena < 1)].index
 
 
 def Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10):
     encoder = MoveWheel(mouse_pos.index[0], mouse_pos.index[-1], patch = patch)
         
-    entry = AtGate(mouse_pos)
+    entry = EnterArena(mouse_pos)
         
     Visits = {'start':[],'end':[], 'distance':[], 'duration':[], 'speed':[], 'acceleration':[], 'weight':[],'state':[], 'entry':[]}
     
