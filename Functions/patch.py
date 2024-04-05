@@ -84,7 +84,17 @@ def PositionInPatch(mouse_pos, r = 30):
     mouse_pos['Patch'] = np.where(distance1 < r, 1, 0) + np.where(distance2 < r, 1, 0)
     
     return mouse_pos
+
+def PositionInArena(mouse_pos):
+    X, Y = mouse_pos.x.to_numpy(), mouse_pos.y.to_numpy()
+    x_o = (min(X) + max(X))/2
+    y_o = (min(Y) + max(Y))/2
+    r = ((max(X)-min(X))/2 + (max(Y)-min(Y))/2)/2 - 10
     
+    distance = np.sqrt((mouse_pos['smoothed_position_x'] - x_o) ** 2 + (mouse_pos['smoothed_position_y'] - y_o) ** 2)
+    mouse_pos['Arena'] = np.where(distance < r, 1, 0)
+    
+    return mouse_pos
     
         
 def InPatch(mouse_pos, r = 30, interval = 5):

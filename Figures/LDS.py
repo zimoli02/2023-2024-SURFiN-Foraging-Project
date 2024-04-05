@@ -47,45 +47,68 @@ def main():
         obs = GetRawData()
     
 
-    start, end = 2200, 2260
+    start, end = 2220, 2240
+    dt = 0.018
     
-    x, y = obs[0][start:end], obs[1][start:end]
+    x = obs[0][start:end]
+    x_vel = np.array([(x[i+1]-x[i])/dt for i in range(len(x)-1)])
+    x_vel = np.concatenate((np.array([0]), x_vel))
+    x_acce = np.array([(x_vel[i+1]-x_vel[i])/dt for i in range(len(x_vel)-1)])
+    x_acce = np.concatenate((np.array([0]), x_acce))
         
     smoothRes = np.load('../Data/ProcessedMouseKinematics/ShortSession0smoothRes.npz')
     smooth_x = smoothRes['xnN'][0][0][start_:end_][start:end]
-    smooth_y = smoothRes['xnN'][3][0][start_:end_][start:end]
     smooth_x_var = smoothRes['VnN'][0][0][start_:end_][start:end]
-    smooth_y_var = smoothRes['VnN'][3][3][start_:end_][start:end]
+
+    smooth_x_vel = smoothRes['xnN'][1][0][start_:end_][start:end]
+    smooth_x_vel_var = smoothRes['VnN'][1][1][start_:end_][start:end]
+    
+    smooth_x_acce = smoothRes['xnN'][2][0][start_:end_][start:end]
+    smooth_x_acce_var = smoothRes['VnN'][2][2][start_:end_][start:end]
 
     time = np.arange(0, len(x), 1)
         
-    fig, axs = plt.subplots(1,2, figsize = (12,4))
-    axs[0].plot(time, x, color = 'black', linewidth = 0.5, label = 'Raw X')
-    axs[0].scatter(time, x, color = 'black', s = 2)
-    axs[0].plot(time, smooth_x, color = 'red', linewidth = 0.5, label = 'Smoothed X')
-    axs[0].scatter(time, smooth_x, color = 'red', s = 2)
+    fig, axs = plt.subplots(1,3, figsize = (16,8))
+    axs[0].plot(time, x, color = 'black', linewidth = 1, label = 'Raw')
+    axs[0].scatter(time, x, color = 'black', s = 6)
+    axs[0].plot(time, smooth_x, color = 'red', linewidth = 1, label = 'Smoothed')
+    axs[0].scatter(time, smooth_x, color = 'red', s = 6)
     axs[0].fill_between(time, smooth_x - 1.65*(smooth_x_var**0.5), smooth_x + 1.65*(smooth_x_var**0.5), color = 'pink', alpha = 0.7)
     axs[0].legend(loc = 'upper right')
 
-    axs[1].plot(time, y, color = 'black', linewidth = 0.5, label = 'Raw Y')
-    axs[1].scatter(time, y, color = 'black', s = 2)
-    axs[1].plot(time, smooth_y, color = 'red', linewidth = 0.5, label = 'Smoothed Y')
-    axs[1].scatter(time, smooth_y, color = 'red', s=2)
-    axs[1].fill_between(time, smooth_y - 1.65*(smooth_y_var**0.5), smooth_y + 1.65*(smooth_y_var**0.5), color = 'pink', alpha = 0.7)
+    axs[1].plot(time, x_vel, color = 'black', linewidth = 1, label = 'Raw')
+    axs[1].scatter(time, x_vel, color = 'black', s = 6)
+    axs[1].plot(time, smooth_x_vel, color = 'blue', linewidth = 1, label = 'Smoothed')
+    axs[1].scatter(time, smooth_x_vel, color = 'blue', s=6)
+    axs[1].fill_between(time, smooth_x_vel - 1.65*(smooth_x_vel_var**0.5), smooth_x_vel + 1.65*(smooth_x_vel_var**0.5), color = 'lightblue', alpha = 0.7)
     axs[1].legend(loc = 'upper right')
+    
+    axs[2].plot(time, x_acce, color = 'black', linewidth = 1, label = 'Raw')
+    axs[2].scatter(time, x_acce, color = 'black', s = 6)
+    axs[2].plot(time, smooth_x_acce, color = 'green', linewidth = 1, label = 'Smoothed')
+    axs[2].scatter(time, smooth_x_acce, color = 'green', s=6)
+    axs[2].fill_between(time, smooth_x_acce - 1.65*(smooth_x_acce_var**0.5), smooth_x_acce + 1.65*(smooth_x_acce_var**0.5), color = 'lightgreen', alpha = 0.7)
+    axs[2].legend(loc = 'upper right')
 
-    axs[0].set_ylabel('Position X')
+    
     axs[0].set_yticks([584, 586, 588, 590, 592, 594, 596])
-    axs[1].set_ylabel('Position Y')
-    axs[1].set_yticks([230, 235, 240, 245, 250])
+    #axs[1].set_ylabel('Position Y')
+    #axs[1].set_yticks([230, 235, 240, 245, 250])
+    
+    axs[0].set_xlabel('Position', fontsize = 16)
+    axs[1].set_xlabel('Speed', fontsize = 16)
+    axs[2].set_xlabel('Acceleration', fontsize = 16)
         
     axs[0].set_xticks([])
     axs[1].set_xticks([])
+    axs[2].set_xticks([])
 
     axs[0].spines['top'].set_visible(False)
     axs[0].spines['right'].set_visible(False)
     axs[1].spines['top'].set_visible(False)
     axs[1].spines['right'].set_visible(False)
+    axs[2].spines['top'].set_visible(False)
+    axs[2].spines['right'].set_visible(False)
         
     plt.autoscale()
     plt.savefig('../Figures/Results/LDS.png')

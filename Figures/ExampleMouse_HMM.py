@@ -36,7 +36,7 @@ example_sessions = [1,3,4]
 
 feature = ['smoothed_speed', 'smoothed_acceleration']
 color_names = ['black', "blue", "red", "tan", "green", "brown", "purple", "orange", "black", 'turquoise']
-state_names = ['Rest', 'Eat', 'Work', 'Cling', 'Explore', 'Forage']
+state_names = ['Resting', 'Eating', 'Digging', 'Clinging', 'Exploring', 'Fast-Leaving']
 alpha = [0.3, 0.3, 0.1, 0.3, 0.7, 1]
 
 def FindModels():
@@ -182,7 +182,7 @@ def DisplayExampleSessionPosition(id, n, denoise = True):
         axs[i].set_xlim(145, 1250)
         axs[i].set_ylim(50, 1080)
         #axs[i].set_title('State ' + str(i))
-        axs[i].set_title(state_names[i])
+        axs[i].set_title(state_names[i], fontsize = 20)
         axs[i].set_xlabel('X')
     axs[0].set_ylabel('Y')
     plt.savefig('../Figures/Results/ExamplePositionMap.png')
@@ -205,7 +205,7 @@ def DisplayExampleSessionPosition_Speed(id, n, denoise = True):
         axs[i].scatter(x[states == i], y[states == i], color = colors, s = 2, alpha = alpha[i])
         axs[i].set_xlim(145, 1250)
         axs[i].set_ylim(50, 1080)
-        axs[i].set_title('State ' + str(i))
+        axs[i].set_title(state_names[i], fontsize = 20)
         axs[i].set_xlabel('X')
     axs[0].set_ylabel('Y')
     plt.savefig('../Figures/Results/ExamplePositionMap_Speed.png')
@@ -224,11 +224,11 @@ def DisplayExampleSessionPosition_Acce(id, n, denoise = True):
     fig, axs = plt.subplots(1, n, figsize = (n*8-2,6))
     for i in range(n):
         x_acce_dir = flag[states == i]
-        colors = ['blue' if j else 'red' for j in x_acce_dir]
+        colors = ['green' if j else 'purple' for j in x_acce_dir]
         axs[i].scatter(x[states == i], y[states == i], color = colors, s = 2, alpha = alpha[i])
         axs[i].set_xlim(145, 1250)
         axs[i].set_ylim(50, 1080)
-        axs[i].set_title('State ' + str(i))
+        axs[i].set_title(state_names[i], fontsize = 20)
         axs[i].set_xlabel('X')
     axs[0].set_ylabel('Y')
     plt.savefig('../Figures/Results/ExamplePositionMap_Acce.png')
@@ -289,7 +289,49 @@ def Pellets(id, n):
     plt.savefig('../Figures/Results/ExamplePelletStates.png')
     plt.show()
     
+def DisplayExampleSessionState(id, n, denoise = True):
+    mouse_pos = GetStates(id, n, denoise=denoise)
+    start, end = pd.Timestamp('2022-06-21 11:11:20.0'), pd.Timestamp('2022-06-21 11:12:00.0')
+    mouse_pos = mouse_pos[start:end]
+    HMM.PlotStates(mouse_pos['states'].to_numpy(), mouse_pos, n, title = '../Figures/Results/ExampleStates.png')
+    
+    
+def DataInArena(id, n, denoise):
+    mouse_pos = GetStates(id, n, denoise=denoise)
+    mouse_pos = patch.PositionInArena(mouse_pos)
 
+    mouse_pos = mouse_pos[mouse_pos['Arena'] == 1]
+    
+    explore = mouse_pos[mouse_pos['states'] == 4]
+    speed_explore, acce_explore = explore.smoothed_speed.to_numpy(), explore.smoothed_acceleration.to_numpy()
+    
+    leave = mouse_pos[mouse_pos['states'] == 5]
+    speed_leave, acce_leave = leave.smoothed_speed.to_numpy(), leave.smoothed_acceleration.to_numpy()
+    
+    mean_speed = np.array([np.mean(speed_explore), np.mean(speed_leave)])
+    var_speed = np.array([np.var(speed_explore), np.var(speed_leave)])
+    
+    mean_acce = np.array([np.mean(acce_explore), np.mean(acce_leave)])
+    var_acce = np.array([np.var(acce_explore), np.var(acce_leave)])
+    
+    width = 0.2
+    fig, axs = plt.subplots(2, 1, figsize = (4, 4*2))
+    axs[0].bar(np.arange(2), mean_speed, yerr=var_speed**0.5, width = width, capsize=5, color = 'blue')
+    axs[1].bar(np.arange(2), mean_acce, yerr=var_acce**0.5, width = width, capsize=5, color = 'orange')
+    axs[0].set_xticks(range(2), ['Explore', 'Fast-Leave'])
+    axs[1].set_xticks(range(2), ['Explore', 'Fast-Leave'])
+    axs[0].set_ylabel('Speed')
+    axs[1].set_ylabel('Acceleration')
+    
+    axs[0].spines['top'].set_visible('False')
+    axs[0].spines['right'].set_visible('False')
+    axs[1].spines['top'].set_visible('False')
+    axs[1].spines['right'].set_visible('False')
+    
+    plt.savefig('../Figures/Results/ExampleSessionParameters_Arena.png')
+    plt.show()
+    
+    
 
 def main():
     ID = 1
@@ -301,8 +343,11 @@ def main():
     #DisplayExampleSessionPosition(id = ID, n = N)
     #DisplayExampleSessionPosition_Speed(id = ID, n = N)
     #DisplayExampleSessionPosition_Acce(id = ID, n = N)
-    Pellets(id = ID, n=N)
+    #Pellets(id = ID, n=N)
     #DisplayExampleSessionTransM(id = ID, n= N, denoise=True)
+    #DisplayExampleSessionState(id = ID, n=N, denoise = True)
+    
+    DataInArena(id = ID, n = N, denoise=True)
 
     #FitModelsLong()
     

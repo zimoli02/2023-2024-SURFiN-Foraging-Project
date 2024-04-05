@@ -38,7 +38,7 @@ example_sessions = [1]
 
 def ConcatenateSessions():
     dfs = []
-    for i in example_sessions:
+    for i in range(len(short_sessions)):
         title = 'ShortSession'+str(i)
         Visits_Patch1 = pd.read_parquet('../Data/RegressionPatchVisits/' + title + 'Visit1.parquet', engine='pyarrow')
         Visits_Patch2 = pd.read_parquet('../Data/RegressionPatchVisits/' + title + 'Visit2.parquet', engine='pyarrow')
@@ -57,7 +57,7 @@ def Variables(VISIT, feature, predictor = 'distance'):
     X = pd.DataFrame(scaler.fit_transform(X), index = X.index, columns = X.columns)
     X['interc'] = 1
     Y = VISIT[predictor]
-    Y = Y // 0.04
+    Y = Y 
     
     return X, Y
 
@@ -90,15 +90,15 @@ def CrossValidation(X, Y, type, split_perc = 0.75):
         corr = np.corrcoef(Y_test, Y_test_pred)[0,1]
         CORR.append(corr)
         
-        if corr > corr_max: model_valid = model
+        if corr > corr_max:  result_valid = result
     
-    return model_valid, np.mean(CORR)
+    return result_valid, np.mean(CORR)
         
     
 def Model(X, Y, type = 'Poisson'):
-    model, average_corre = CrossValidation(X, Y, type)
+    result, average_corre = CrossValidation(X, Y, type)
     
-    result = model.fit()
+    #result = model.fit()
     y_pred = result.predict(X)
     
     return result, y_pred, average_corre
@@ -120,7 +120,7 @@ def PlotModelPrediction(obs, pred, predictor = 'Distance', TYPE = 'Poisson'):
     axs[1].spines['right'].set_visible(False)
     axs[1].legend()
         
-    plt.savefig('../Figures/Results/' + TYPE + '.png')
+    plt.savefig('../Figures/Results/' + TYPE + 'Model.png')
     plt.show()
 
 
@@ -130,16 +130,16 @@ def PrintModelSummary(result, TYPE):
     axs.text(0.5, 0.5, str(result.summary()),
                 verticalalignment='center', horizontalalignment='left',
                 transform=axs.transAxes, fontsize=12)
-    plt.savefig('../Figures/Results/' + TYPE + '.png')
+    plt.savefig('../Figures/Results/' + TYPE + 'Summary.png')
     plt.show()   
 
 def FitModels():
-    #TYPES = ['Poisson', 'Gaussian', 'Gamma']
-    TYPES = ['Poisson', 'Gaussian']
+    TYPES = ['Poisson', 'Gaussian', 'Gamma']
+    #TYPES = ['Gaussian']
     PREDICTOR = 'distance'
     
     VISIT = ConcatenateSessions()
-    X, Y = Variables(VISIT, feature = ['speed','acceleration', 'weight','PelletsInLastVisitSelf', 'PelletsInLastVisitOther', 'IntervalLastVisit' ,'entry'], predictor=PREDICTOR)
+    X, Y = Variables(VISIT, feature = ['speed','acceleration', 'PelletsInLastVisitSelf', 'PelletsInLastVisitOther', 'IntervalLastVisit' ,'entry'], predictor=PREDICTOR)
     
     for TYPE in TYPES:
         result, y_pred, average_corre = Model(X, Y, type = TYPE)
@@ -166,7 +166,7 @@ def FeatureProcess(pre_period_seconds = 10):
 
 
 def main():
-    #FeatureProcess(pre_period_seconds = 5)
+    #FeatureProcess(pre_period_seconds = 30)
     FitModels()
         
         

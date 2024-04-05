@@ -19,7 +19,7 @@ from SSM.ssm.plots import gradient_cmap, white_to_color_cmap
 sns.set_style("white")
 sns.set_context("talk")
 
-color_names = ["blue","red","tan", "green","brown","purple","orange", "black", 'turquoise']
+color_names = ['black', "blue", "red", "tan", "green", "brown", "purple", "orange", "black", 'turquoise']
 colors = sns.xkcd_palette(color_names)
 cmap = gradient_cmap(colors)
 
@@ -33,7 +33,7 @@ def PlotLLS(hmm_lls):
 
 
 
-def PlotStates(hmm_z, mouse_pos, N):
+def PlotStates(hmm_z, mouse_pos, N, title):
     times = pd.to_datetime(mouse_pos.index)
     numerical_times = (times - times[0]).total_seconds().values
     states_array = hmm_z.reshape(1, -1)
@@ -53,8 +53,8 @@ def PlotStates(hmm_z, mouse_pos, N):
     cbar.set_ticks(np.arange(0, N))
     cbar.set_ticklabels([f'State {val}' for val in np.arange(0, N)])
     
-    plt.tight_layout()
-    plt.show()
+    #axs.set_title("Learned Transition Matrix") 
+    plt.savefig(title)
 
 
 def PlotTransition(transition_mat, title):
