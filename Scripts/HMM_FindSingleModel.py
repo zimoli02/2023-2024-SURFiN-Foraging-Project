@@ -28,7 +28,7 @@ sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
 short_sessions = sessions.iloc[[4,16,17,20,23,24,25,28,29,30,31]]
 long_sessions = sessions.iloc[[8, 10, 11, 14]]
 
-feature = ['smoothed_speed', 'smoothed_acceleration']
+feature = ['smoothed_speed', 'smoothed_acceleration', 'r']
 
 def FindModelsShort():
     LogLikelihood = []
@@ -51,19 +51,20 @@ def FindModelsShort():
         OBS = np.array(MOUSE_POS[feature])
         
         LL = []
-        N = np.arange(3,11,1)
+        N = np.arange(3,28,1)
         for n in N:
             hmm, states, transition_mat, lls = HMM.FitHMM(obs, num_states = n, n_iters = 50)
             ll = hmm.log_likelihood(OBS)
             LL.append(ll)
         
         LogLikelihood.append(LL)
-        np.save('../Data/HMMStates/LL.npy', LogLikelihood)
+        np.save('../Data/HMMStates/LL_3.npy', LogLikelihood)
 
 
 def DisplayModelsShort():
-    N = np.arange(3,11,1)
-    LogLikelihood = np.load('../Data/HMMStates/LL.npy', allow_pickle=True)
+    N = np.arange(3,28,1)
+    LogLikelihood = np.load('../Data/HMMStates/LL_3.npy', allow_pickle=True)
+    '''
     for i in range(len(LogLikelihood)):
         title = 'ShortSession' + str(i)
         LL = LogLikelihood[i]
@@ -74,6 +75,7 @@ def DisplayModelsShort():
         axs.set_xticks(N)
         plt.savefig('../Images/HMM_StateChoice/' + title+'.png')
         plt.show()
+    '''
         
     fig, axs = plt.subplots(1,1,figsize = (10,7))
     for i in range(len(LogLikelihood)):
@@ -81,7 +83,7 @@ def DisplayModelsShort():
         axs.scatter(N, LL)
         axs.plot(N, LL, color = 'black')
     axs.set_xticks(N)
-    plt.savefig('../Images/HMM_StateChoice/Summary.png')
+    plt.savefig('../Images/HMM_StateChoice/Summary_3.png')
     plt.show()
 
 def main():

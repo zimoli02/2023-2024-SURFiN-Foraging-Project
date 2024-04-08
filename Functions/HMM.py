@@ -23,6 +23,7 @@ color_names = ['black', "blue", "red", "tan", "green", "brown", "purple", "orang
 colors = sns.xkcd_palette(color_names)
 cmap = gradient_cmap(colors)
 
+
 def PlotLLS(hmm_lls):
     plt.plot(hmm_lls, label="EM")
     #plt.plot([0, N_iters], true_ll * np.ones(2), ':k', label="True")

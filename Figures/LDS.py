@@ -12,62 +12,36 @@ from pathlib import Path
 aeon_mecha_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(aeon_mecha_dir))
 
-import aeon
-import aeon.io.api as api
-from aeon.schema.dataset import exp02
-from aeon.analysis.utils import visits
 
 import Functions.kinematics as kinematics
-import Functions.inference as inference 
 
-root = [Path("/ceph/aeon/aeon/data/raw/AEON2/experiment0.2")]
-
-subject_events = api.load(root, exp02.ExperimentalMetadata.SubjectState)
-sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
-short_sessions = sessions.iloc[[4,16,17,20,23,24,25,28,29,30,31]]
-long_sessions = sessions.iloc[[8, 10, 11, 14]]
-
-start_, end_ = 10*60*50, 11*60*50
-
+start, end = 10*60*50+2220, 10*60*50+2240
+dt = 0.02
 scale = 2e-3
-
-def GetRawData():
-    start, end = pd.Timestamp('2022-03-15 12:40:36.282139778'), pd.Timestamp('2022-03-15 15:56:55.801119804')
-    mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
-    mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, fix_nan=False, fix_nest=False)
-    
-    obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())[:, start_:end_]
-    np.save('../Data/MouseKinematicParameters/ShortSession0Raw.npy', obs)
-    
-    return obs
 
 def main():
     # Display short session 0 as an example
     try:
-        obs = np.load('../Data/MouseKinematicParameters/ShortSession0Raw.npy', allow_pickle=True)
+        mouse_pos = pd.read_parquet('ShortSession0_mousepos.parquet', engine='pyarrow')
     except FileNotFoundError:
-        obs = GetRawData()
+        mouse_pos = pd.read_parquet('../Data/RawMouseKinematics/' + 'ShortSession0' + 'mousepos.parquet', engine='pyarrow')
+        kinematics.AddKinematics('ShortSession0', mouse_pos) 
+        mouse_pos.to_parquet('ShortSession0_mousepos.parquet', engine='pyarrow')
     
-
-    start, end = 2220, 2240
-    dt = 0.02
-
-    
-    x = obs[0][start:end] * scale
+    x = mouse_pos.x[start:end] * scale
     x_vel = np.array([(x[i+1]-x[i])/dt for i in range(len(x)-1)])
     x_vel = np.concatenate((np.array([0]), x_vel))
     x_acce = np.array([(x_vel[i+1]-x_vel[i])/dt for i in range(len(x_vel)-1)])
     x_acce = np.concatenate((np.array([0]), x_acce))
         
-    smoothRes = np.load('../Data/ProcessedMouseKinematics/ShortSession0smoothRes.npz')
-    smooth_x = smoothRes['xnN'][0][0][start_:end_][start:end] * scale
-    smooth_x_var = smoothRes['VnN'][0][0][start_:end_][start:end] * scale ** 2
+    smooth_x = mouse_pos.smoothed_position_x[start:end] * scale
+    smooth_x_var = mouse_pos.smoothed_position_x_var[start:end] * scale ** 2
 
-    smooth_x_vel = smoothRes['xnN'][1][0][start_:end_][start:end] * scale
-    smooth_x_vel_var = smoothRes['VnN'][1][1][start_:end_][start:end] * scale ** 2
+    smooth_x_vel = mouse_pos.smoothed_velocity_x[start:end] * scale
+    smooth_x_vel_var = mouse_pos.smoothed_velocity_x_var[start:end] * scale ** 2
     
-    smooth_x_acce = smoothRes['xnN'][2][0][start_:end_][start:end] * scale
-    smooth_x_acce_var = smoothRes['VnN'][2][2][start_:end_][start:end] * scale ** 2
+    smooth_x_acce = mouse_pos.smoothed_acceleration_x[start:end] * scale
+    smooth_x_acce_var = mouse_pos.smoothed_acceleration_x_var[start:end] * scale ** 2
 
     time = np.arange(0, len(x), 1)
     time = time * dt
@@ -99,12 +73,6 @@ def main():
     axs[0].set_ylabel('Position (m)', fontsize = 16)
     axs[1].set_ylabel('Speed (m/s)', fontsize = 16)
     axs[2].set_ylabel('Acceleration (m/s$^2$)', fontsize = 16)
-    
-    '''
-    axs[0].set_title('Position', fontsize = 20)
-    axs[1].set_title('Speed', fontsize = 20)
-    axs[2].set_title('Acceleration', fontsize = 20)
-    '''
 
     for i in range(3):
         axs[i].set_xticks(np.arange(0,time[-1]+0.01, 0.05))

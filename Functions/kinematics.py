@@ -279,6 +279,13 @@ def AddKinematics(title, mouse_pos):
     mouse_pos['smoothed_velocity_y'] = pd.Series(smoothRes['xnN'][4][0], index=mouse_pos.index)
     mouse_pos['smoothed_acceleration_x'] = pd.Series(smoothRes['xnN'][2][0], index=mouse_pos.index)
     mouse_pos['smoothed_acceleration_y'] = pd.Series(smoothRes['xnN'][5][0], index=mouse_pos.index)
+    
+    mouse_pos['smoothed_position_x_var'] = pd.Series(smoothRes['VnN'][0][0], index=mouse_pos.index)
+    mouse_pos['smoothed_position_y_var'] = pd.Series(smoothRes['VnN'][3][3], index=mouse_pos.index)
+    mouse_pos['smoothed_velocity_x_var'] = pd.Series(smoothRes['VnN'][1][1], index=mouse_pos.index)
+    mouse_pos['smoothed_velocity_y_var'] = pd.Series(smoothRes['VnN'][4][4], index=mouse_pos.index)
+    mouse_pos['smoothed_acceleration_x_var'] = pd.Series(smoothRes['VnN'][2][2], index=mouse_pos.index)
+    mouse_pos['smoothed_acceleration_y_var'] = pd.Series(smoothRes['VnN'][5][5], index=mouse_pos.index)
 
     x_vel, y_vel = mouse_pos['smoothed_velocity_x'], mouse_pos['smoothed_velocity_y']
     vel = np.sqrt(x_vel**2 + y_vel**2)

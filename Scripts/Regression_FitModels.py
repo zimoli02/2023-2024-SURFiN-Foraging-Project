@@ -36,9 +36,8 @@ long_sessions = sessions.iloc[[8, 10, 11, 14]]
 
 def ConcatenateSessions():
     dfs = []
-    for session, i in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
+    for i in range(len(short_sessions)):
         title = 'ShortSession'+str(i)
-        print(title)
         Visits_Patch1 = pd.read_parquet('../Data/RegressionPatchVisits/' + title + 'Visit1.parquet', engine='pyarrow')
         Visits_Patch2 = pd.read_parquet('../Data/RegressionPatchVisits/' + title + 'Visit2.parquet', engine='pyarrow')
         dfs.append(Visits_Patch1)
@@ -56,7 +55,6 @@ def Variables(VISIT, feature, predictor = 'distance'):
     X = pd.DataFrame(scaler.fit_transform(X), index = X.index, columns = X.columns)
     X['interc'] = 1
     Y = VISIT[predictor]
-    #Y  = Y // 0.04
     
     return X, Y
 
@@ -70,8 +68,8 @@ def CrossValidation(X, Y, type, split_perc = 0.75):
     split_size = int(len(Y) * split_perc)
     indices = np.arange(len(Y))
     
-    CORR = []
-    corr_max = -1
+    MSE = []
+    MSE_max = 1e10
     
     for i in range(1000):
         np.random.shuffle(indices)
@@ -84,23 +82,26 @@ def CrossValidation(X, Y, type, split_perc = 0.75):
         
         model = FitModel(X_train,Y_train,type)
         result = model.fit()
-        
         Y_test_pred = result.predict(X_test)
-        corr = np.corrcoef(Y_test, Y_test_pred)[0,1]
-        CORR.append(corr)
         
-        if corr > corr_max: model_valid = model
+        mse = np.mean((Y_test_pred - Y_test) ** 2)
+        
+        MSE.append(mse)
+        
+        if mse < MSE_max:  
+            result_valid = result
+            MSE_max = mse
     
-    return model_valid, np.mean(CORR)
+    return result_valid, np.mean(MSE)
         
     
 def Model(X, Y, type = 'Poisson'):
-    model, average_corre = CrossValidation(X, Y, type)
+    result, average_mse = CrossValidation(X, Y, type)
     
-    result = model.fit()
+    #result = model.fit()
     y_pred = result.predict(X)
     
-    return result, y_pred, average_corre
+    return result, y_pred, average_mse
 
 def PlotModelPrediction(obs, pred, predictor = 'Distance', TYPE = 'Poisson'):
     fig, axs = plt.subplots(2, 1, figsize=(15, 5), sharex=True)
@@ -119,23 +120,30 @@ def PlotModelPrediction(obs, pred, predictor = 'Distance', TYPE = 'Poisson'):
     axs[1].spines['right'].set_visible(False)
     axs[1].legend()
         
-    plt.savefig('../Images/Regression/AllSessionsData/' + TYPE + '.png')
+    plt.savefig('../Images/Regression/AllSessionsModel/' + TYPE + 'Model.png')
     plt.show()
 
+
 def PlotModelPrediction_Scatter(obs, pred, predictor = 'Distance', TYPE = 'Poisson'):
-    fig, axs = plt.subplots(1, 1, figsize=(10, 10), sharex=True)
+    fig, axs = plt.subplots(1, 1, figsize=(10, 10))
     x = obs.to_numpy()
     y = pred.to_numpy()
-    axs.scatter(x, y, s = 2)
+    axs.scatter(x, y, s = 10)
     
-    axs.set_aspect('equal', adjustable='box')
-    axs.set_xticks([]) 
-    axs.set_ylabel(predictor, fontsize = 12)
+    x_ = np.arange(0,2501,100)
+    axs.plot(x_, x_, color = 'red', linestyle = ':', linewidth = 1, label = 'y = x')
+    
+    axs.set_xlabel('Observed '+ predictor[0].upper() + predictor[1:] + ' (mm)', fontsize = 24)
+    axs.set_ylabel('Predicted' + predictor[0].upper() + predictor[1:] + ' (mm)', fontsize = 24)
+    #axs.set_aspect('equal', adjustable='box')
+    axs.set_xlim(0,2500)
+    axs.set_ylim(0,2500)
     axs.spines['top'].set_visible(False)
     axs.spines['right'].set_visible(False)
+    axs.legend(fontsize = 20)
 
     plt.tight_layout()
-    plt.savefig('../Images/Regression/AllSessionsData_Scatter/' + TYPE + '.png')
+    plt.savefig('../Images/Regression/AllSessionsModel/' + TYPE + 'Model_Scatter.png')
     plt.show()
 
 def PrintModelSummary(result, TYPE):
@@ -144,29 +152,29 @@ def PrintModelSummary(result, TYPE):
     axs.text(0.5, 0.5, str(result.summary()),
                 verticalalignment='center', horizontalalignment='left',
                 transform=axs.transAxes, fontsize=12)
-    plt.savefig('../Images/Regression/AllSessionsParams/' + TYPE + '.png')
+    plt.savefig('../Images/Regression/AllSessionsParams/' + TYPE + 'Summary.png')
     plt.show()   
+
+def FitModels(VISIT, TYPES, PREDICTOR):
+    X, Y = Variables(VISIT, feature = ['speed','acceleration', 'PelletsInLastVisitSelf', 'PelletsInLastVisitOther', 'IntervalLastVisit' ,'entry'], predictor=PREDICTOR)
+    
+    for TYPE in TYPES:
+        result, y_pred, average_mse = Model(X, Y, type = TYPE)
+        print("Average MSE per Prediction for " + TYPE + " Model Fitted: ", average_mse)
+        
+        PlotModelPrediction(Y, y_pred, predictor=PREDICTOR, TYPE = TYPE)
+        PlotModelPrediction_Scatter(Y, y_pred, predictor=PREDICTOR, TYPE = TYPE)
+        PrintModelSummary(result, TYPE)
 
 
 def main():
     TYPES = ['Poisson', 'Gaussian', 'Gamma']
     PREDICTOR = 'distance'
+    VISIT = pd.read_parquet('../Data/RegressionPatchVisits/VISIT.parquet', engine='pyarrow')
     
-    VISIT = ConcatenateSessions()
-    X, Y = Variables(VISIT, feature = ['speed_x','speed_y','acceleration_x', 'acceleration_y', 'PelletsInLastVisitSelf', 'PelletsInLastVisitOther', 'IntervalLastVisit' ,'entry'], predictor=PREDICTOR)
-    
-    for TYPE in TYPES:
-        result, y_pred, average_corre = Model(X, Y, type = TYPE)
-        print("Average Correlation for " + TYPE + " Model Fitted: ", average_corre)
-        
-        PlotModelPrediction(Y, y_pred, predictor=PREDICTOR, TYPE = TYPE)
-        PlotModelPrediction_Scatter(Y, y_pred, predictor=PREDICTOR, TYPE = TYPE)
-        
-        #PrintModelSummary(result, TYPE)
-        
-        
-        
-        
+    FitModels(VISIT, TYPES, PREDICTOR)
+
+
 
 if __name__ == "__main__":
     main()

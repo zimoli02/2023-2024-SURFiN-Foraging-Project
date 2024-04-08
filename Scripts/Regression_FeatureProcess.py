@@ -26,6 +26,21 @@ sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
 short_sessions = sessions.iloc[[4,16,17,20,23,24,25,28,29,30,31]]
 long_sessions = sessions.iloc[[8, 10, 11, 14]]
 
+def ConcatenateSessions():
+    dfs = []
+    for i in range(len(short_sessions)):
+        title = 'ShortSession'+str(i)
+        Visits_Patch1 = pd.read_parquet('../Data/RegressionPatchVisits/' + title + 'Visit1.parquet', engine='pyarrow')
+        Visits_Patch2 = pd.read_parquet('../Data/RegressionPatchVisits/' + title + 'Visit2.parquet', engine='pyarrow')
+        dfs.append(Visits_Patch1)
+        dfs.append(Visits_Patch2)
+        
+    VISIT = pd.concat(dfs, ignore_index=False)
+    VISIT = VISIT[VISIT['distance'] >= 0.1]
+    VISIT['interc'] = 1
+    
+    return VISIT
+
 def main():
     for session, i in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
         title = 'ShortSession'+str(i)
@@ -43,7 +58,8 @@ def main():
         
         print(title)
 
-    
+    VISIT = ConcatenateSessions()
+    VISIT.to_parquet('../Data/RegressionPatchVisits/VISIT.parquet', engine='pyarrow')
 
 if __name__ == "__main__":
     main()
