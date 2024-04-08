@@ -155,7 +155,7 @@ def Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10):
         
     entry = EnterArena(mouse_pos)
         
-    Visits = {'start':[],'end':[], 'distance':[], 'duration':[], 'speed':[], 'acceleration':[], 'weight':[],'state':[], 'entry':[]}
+    Visits = {'start':[],'end':[], 'distance':[], 'duration':[], 'speed':[], 'speed_x':[], 'speed_y':[], 'acceleration':[], 'acceleration_x':[], 'acceleration_y':[], 'weight':[],'entry':[]}
     
     groups = encoder['Move'].ne(encoder['Move'].shift()).cumsum()
     visits = encoder[encoder['Move'] == 1].groupby(groups)['Move']
@@ -168,18 +168,23 @@ def Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10):
         pre_end = group.index[0]
         pre_start = pre_end - pd.Timedelta(seconds = pre_period_seconds)
         if pre_start < mouse_pos.index[0]: pre_start = mouse_pos.index[0]
+        
+        index = entry.searchsorted(pre_end, side='left') - 1
+        index = max(index, 0)
+        #last_enter = entry[index]
+        Visits['entry'].append((pre_end - entry[index]).total_seconds())
             
         pre_visit_data = mouse_pos.loc[pre_start:pre_end]
         
         Visits['speed'].append(pre_visit_data['smoothed_speed'].mean())
+        Visits['speed_x'].append(pre_visit_data['smoothed_velocity_x'].mean())
+        Visits['speed_y'].append(pre_visit_data['smoothed_velocity_y'].mean())
         Visits['acceleration'].append(pre_visit_data['smoothed_acceleration'].mean())
+        Visits['acceleration_x'].append(pre_visit_data['smoothed_acceleration_x'].mean())
+        Visits['acceleration_y'].append(pre_visit_data['smoothed_acceleration_y'].mean())
         Visits['weight'].append(pre_visit_data['weight'].mean())
-        Visits['state'].append(pre_visit_data['states'].value_counts().idxmax())
-            
+        #Visits['state'].append(pre_visit_data['states'].value_counts().idxmax())
 
-        index = entry.searchsorted(pre_end, side='left') - 1
-        index = max(index, 0)
-        Visits['entry'].append((pre_end - entry[index]).total_seconds())
     
     return pd.DataFrame(Visits)
 

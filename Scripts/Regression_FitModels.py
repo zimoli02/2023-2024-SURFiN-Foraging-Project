@@ -56,7 +56,7 @@ def Variables(VISIT, feature, predictor = 'distance'):
     X = pd.DataFrame(scaler.fit_transform(X), index = X.index, columns = X.columns)
     X['interc'] = 1
     Y = VISIT[predictor]
-    Y = Y // 0.04
+    #Y  = Y // 0.04
     
     return X, Y
 
@@ -122,6 +122,21 @@ def PlotModelPrediction(obs, pred, predictor = 'Distance', TYPE = 'Poisson'):
     plt.savefig('../Images/Regression/AllSessionsData/' + TYPE + '.png')
     plt.show()
 
+def PlotModelPrediction_Scatter(obs, pred, predictor = 'Distance', TYPE = 'Poisson'):
+    fig, axs = plt.subplots(1, 1, figsize=(10, 10), sharex=True)
+    x = obs.to_numpy()
+    y = pred.to_numpy()
+    axs.scatter(x, y, s = 2)
+    
+    axs.set_aspect('equal', adjustable='box')
+    axs.set_xticks([]) 
+    axs.set_ylabel(predictor, fontsize = 12)
+    axs.spines['top'].set_visible(False)
+    axs.spines['right'].set_visible(False)
+
+    plt.tight_layout()
+    plt.savefig('../Images/Regression/AllSessionsData_Scatter/' + TYPE + '.png')
+    plt.show()
 
 def PrintModelSummary(result, TYPE):
     fig, axs = plt.subplots(figsize=(20, 8))
@@ -138,15 +153,16 @@ def main():
     PREDICTOR = 'distance'
     
     VISIT = ConcatenateSessions()
-    X, Y = Variables(VISIT, feature = ['speed','acceleration', 'weight','PelletsInLastVisitSelf', 'PelletsInLastVisitOther', 'IntervalLastVisit' ,'entry'], predictor=PREDICTOR)
+    X, Y = Variables(VISIT, feature = ['speed_x','speed_y','acceleration_x', 'acceleration_y', 'PelletsInLastVisitSelf', 'PelletsInLastVisitOther', 'IntervalLastVisit' ,'entry'], predictor=PREDICTOR)
     
     for TYPE in TYPES:
         result, y_pred, average_corre = Model(X, Y, type = TYPE)
         print("Average Correlation for " + TYPE + " Model Fitted: ", average_corre)
         
         PlotModelPrediction(Y, y_pred, predictor=PREDICTOR, TYPE = TYPE)
+        PlotModelPrediction_Scatter(Y, y_pred, predictor=PREDICTOR, TYPE = TYPE)
         
-        PrintModelSummary(result, TYPE)
+        #PrintModelSummary(result, TYPE)
         
         
         

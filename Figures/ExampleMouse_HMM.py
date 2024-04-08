@@ -37,7 +37,9 @@ example_sessions = [1,3,4]
 feature = ['smoothed_speed', 'smoothed_acceleration']
 color_names = ['black', "blue", "red", "tan", "green", "brown", "purple", "orange", "black", 'turquoise']
 state_names = ['Resting', 'Eating', 'Digging', 'Clinging', 'Exploring', 'Fast-Leaving']
-alpha = [0.3, 0.3, 0.1, 0.3, 0.7, 1]
+alpha = [0.4, 0.4, 0.2, 0.4, 0.7, 0.9]
+
+scale = 2e-3
 
 def FindModels():
     LogLikelihood = dict()
@@ -86,6 +88,8 @@ def DisplayLikelihood():
         axs.plot(N, LL, label = 'Session ' + str(key))
     axs.legend(loc = 'lower right')
     axs.set_xticks(N)
+    
+    plt.tight_layout()
     plt.savefig('../Figures/Results/LogLikelihood.png')
     plt.show()
 
@@ -107,6 +111,8 @@ def FitExampleSession(id, n):
     axs[1].set_xticks(range(n-1), [str(i) for i in range(1,n)])
     axs[0].set_ylabel('Speed')
     axs[1].set_ylabel('Acceleration')
+    
+    plt.tight_layout()
     plt.savefig('../Figures/Results/ExampleSessionParameters.png')
     plt.show()
     
@@ -129,6 +135,11 @@ def GetStates(id, n, denoise = True):
     mouse_pos = pd.read_parquet('../Data/MousePos/' + title + 'mousepos.parquet', engine='pyarrow')
     states = np.load('../Figures/Results/States.npy', allow_pickle=True)
     mouse_pos['states'] = pd.Series(states, index = mouse_pos.index)
+    
+    mouse_pos.smoothed_velocity_x = mouse_pos.smoothed_velocity_x * scale
+    mouse_pos.smoothed_acceleration_x = mouse_pos.smoothed_acceleration_x * scale
+    mouse_pos.smoothed_speed = mouse_pos.smoothed_speed * scale
+    mouse_pos.smoothed_acceleration = mouse_pos.smoothed_acceleration * scale
     
     if denoise:
         resampled_mouse_pos = mouse_pos.resample('1S').agg({
@@ -182,9 +193,12 @@ def DisplayExampleSessionPosition(id, n, denoise = True):
         axs[i].set_xlim(145, 1250)
         axs[i].set_ylim(50, 1080)
         #axs[i].set_title('State ' + str(i))
+        axs[i].set_aspect('equal', adjustable='box')
         axs[i].set_title(state_names[i], fontsize = 20)
-        axs[i].set_xlabel('X')
-    axs[0].set_ylabel('Y')
+        axs[i].set_xlabel('X (px)')
+    axs[0].set_ylabel('Y (px)')
+    
+    plt.tight_layout()
     plt.savefig('../Figures/Results/ExamplePositionMap.png')
     plt.show()
     
@@ -205,9 +219,12 @@ def DisplayExampleSessionPosition_Speed(id, n, denoise = True):
         axs[i].scatter(x[states == i], y[states == i], color = colors, s = 2, alpha = alpha[i])
         axs[i].set_xlim(145, 1250)
         axs[i].set_ylim(50, 1080)
+        axs[i].set_aspect('equal', adjustable='box')
         axs[i].set_title(state_names[i], fontsize = 20)
-        axs[i].set_xlabel('X')
-    axs[0].set_ylabel('Y')
+        axs[i].set_xlabel('X (px)')
+    axs[0].set_ylabel('Y (px)')
+    
+    plt.tight_layout()
     plt.savefig('../Figures/Results/ExamplePositionMap_Speed.png')
     plt.show()
 
@@ -228,9 +245,12 @@ def DisplayExampleSessionPosition_Acce(id, n, denoise = True):
         axs[i].scatter(x[states == i], y[states == i], color = colors, s = 2, alpha = alpha[i])
         axs[i].set_xlim(145, 1250)
         axs[i].set_ylim(50, 1080)
+        axs[i].set_aspect('equal', adjustable='box')
         axs[i].set_title(state_names[i], fontsize = 20)
-        axs[i].set_xlabel('X')
-    axs[0].set_ylabel('Y')
+        axs[i].set_xlabel('X (px)')
+    axs[0].set_ylabel('Y (px)')
+    
+    plt.tight_layout()
     plt.savefig('../Figures/Results/ExamplePositionMap_Acce.png')
     plt.show()
 
@@ -314,24 +334,66 @@ def DataInArena(id, n, denoise):
     mean_acce = np.array([np.mean(acce_explore), np.mean(acce_leave)])
     var_acce = np.array([np.var(acce_explore), np.var(acce_leave)])
     
-    width = 0.2
-    fig, axs = plt.subplots(2, 1, figsize = (4, 4*2))
-    axs[0].bar(np.arange(2), mean_speed, yerr=var_speed**0.5, width = width, capsize=5, color = 'blue')
-    axs[1].bar(np.arange(2), mean_acce, yerr=var_acce**0.5, width = width, capsize=5, color = 'orange')
-    axs[0].set_xticks(range(2), ['Explore', 'Fast-Leave'])
-    axs[1].set_xticks(range(2), ['Explore', 'Fast-Leave'])
-    axs[0].set_ylabel('Speed')
-    axs[1].set_ylabel('Acceleration')
+    width = 0.15
+    x_loc = [0,0.2]
+    fig, axs = plt.subplots(2, 1, figsize = (2, 4*2))
+    axs[0].bar(x_loc, mean_speed, yerr=var_speed**0.5, width = width, capsize=5, color = 'blue')
+    axs[1].bar(x_loc, mean_acce, yerr=var_acce**0.5, width = width, capsize=5, color = 'orange')
+    axs[0].set_xticks(x_loc, ['E.', 'F.L.'])
+    axs[1].set_xticks(x_loc, ['E.', 'F.L.'])
+    axs[0].set_ylabel('Speed (m/s)')
+    axs[1].set_ylabel('Acceleration (m/s$^2$)')
     
-    axs[0].spines['top'].set_visible('False')
-    axs[0].spines['right'].set_visible('False')
-    axs[1].spines['top'].set_visible('False')
-    axs[1].spines['right'].set_visible('False')
+    axs[0].spines['top'].set_visible(False)
+    axs[0].spines['right'].set_visible(False)
+    axs[1].spines['top'].set_visible(False)
+    axs[1].spines['right'].set_visible(False)
     
+    plt.tight_layout()
     plt.savefig('../Figures/Results/ExampleSessionParameters_Arena.png')
     plt.show()
     
+def DirectionInArena(id, n, denoise):
+    mouse_pos = GetStates(id, n, denoise=denoise)
+    mouse_pos = patch.PositionInArena(mouse_pos)
     
+    mouse_pos = mouse_pos[mouse_pos['Arena'] == 1]
+    
+    explore = mouse_pos[mouse_pos['states'] == 4]
+    speed_explore_x, acce_explore_x = explore.smoothed_velocity_x.to_numpy(), explore.smoothed_acceleration_x.to_numpy()
+    
+    leave = mouse_pos[mouse_pos['states'] == 5]
+    speed_leave_x, acce_leave_x = leave.smoothed_velocity_x.to_numpy(), leave.smoothed_acceleration_x.to_numpy()
+    
+    speed_explore_dir = np.where(speed_explore_x < 0, -1, 0) + np.where(speed_explore_x > 0, 1, 0)
+    acce_explore_dir = np.where(acce_explore_x < 0, -1, 0) + np.where(acce_explore_x > 0, 1, 0)
+    speed_leave_dir = np.where(speed_leave_x < 0, -1, 0) + np.where(speed_leave_x > 0, 1, 0)
+    acce_leave_dir = np.where(acce_leave_x < 0, -1, 0) + np.where(acce_leave_x > 0, 1, 0)
+    
+    mean_speed = np.array([np.mean(speed_explore_dir), np.mean(speed_leave_dir)])
+    var_speed = np.array([np.var(speed_explore_dir), np.var(speed_leave_dir)])
+    
+    mean_acce = np.array([np.mean(acce_explore_dir), np.mean(acce_leave_dir)])
+    var_acce = np.array([np.var(acce_explore_dir), np.var(acce_leave_dir)])
+    
+    width = 0.15
+    x_loc = [0,0.2]
+    fig, axs = plt.subplots(2, 1, figsize = (2, 4*2))
+    axs[0].bar(x_loc, mean_speed, yerr=var_speed**0.5, width = width, capsize=5, color = 'blue')
+    axs[1].bar(x_loc, mean_acce, yerr=var_acce**0.5, width = width, capsize=5, color = 'orange')
+    
+    for i in range(2):
+        axs[i].set_xticks(x_loc, ['E.', 'F.L.'])
+        axs[i].set_yticks(np.array([-1,0, 1]), ['1.0','0.0', '1.0'])
+        axs[i].set_ylabel('Direction')
+    
+        axs[i].spines['top'].set_visible(False)
+        axs[i].spines['right'].set_visible(False)
+
+    
+    plt.tight_layout()
+    plt.savefig('../Figures/Results/ExampleSessionDirection_Arena.png')
+    plt.show()
 
 def main():
     ID = 1
@@ -340,14 +402,15 @@ def main():
     #DisplayLikelihood()
     #FitExampleSession(id = ID, n = N)
     
-    #DisplayExampleSessionPosition(id = ID, n = N)
-    #DisplayExampleSessionPosition_Speed(id = ID, n = N)
-    #DisplayExampleSessionPosition_Acce(id = ID, n = N)
+    #DisplayExampleSessionPosition(id = ID, n = N, denoise = False)
+    #DisplayExampleSessionPosition_Speed(id = ID, n = N, denoise=False)
+    #DisplayExampleSessionPosition_Acce(id = ID, n = N, denoise = False)
     #Pellets(id = ID, n=N)
     #DisplayExampleSessionTransM(id = ID, n= N, denoise=True)
     #DisplayExampleSessionState(id = ID, n=N, denoise = True)
     
-    DataInArena(id = ID, n = N, denoise=True)
+    #DataInArena(id = ID, n = N, denoise=False)
+    DirectionInArena(id = ID, n = N, denoise=False)
 
     #FitModelsLong()
     

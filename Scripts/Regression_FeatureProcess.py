@@ -34,8 +34,8 @@ def main():
         states = np.load('../Data/HMMStates/' + title+'States_Unit.npy', allow_pickle=True)
         mouse_pos['states'] = pd.Series(states, index=mouse_pos.index)
         
-        Visits_Patch1 = patch.Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10)
-        Visits_Patch2 = patch.Visits(mouse_pos, patch = 'Patch2', pre_period_seconds = 10)
+        Visits_Patch1 = patch.Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 30)
+        Visits_Patch2 = patch.Visits(mouse_pos, patch = 'Patch2', pre_period_seconds = 30)
         Visits_Patch1, Visits_Patch2 = patch.VisitIntervals(Visits_Patch1, Visits_Patch2) 
 
         Visits_Patch1.to_parquet('../Data/RegressionPatchVisits/' + title+'Visit1.parquet', engine='pyarrow')
