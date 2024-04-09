@@ -60,8 +60,8 @@ def main():
     
     Patch1_Update = False
     Patch_Update = False
-    r_Update = False
-    Arena_Update = False
+    r_Update = True
+    Arena_Update = True
     
     for session, i in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
         title = 'ShortSession'+str(i)

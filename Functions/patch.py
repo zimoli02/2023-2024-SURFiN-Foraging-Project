@@ -86,7 +86,7 @@ def PositionInPatch(mouse_pos, r = 30):
     return mouse_pos
 
 def Radius(mouse_pos):
-    x_o, y_o = 696.5707595825195, 562.5901412251667
+    x_o, y_o = 738.7019332885742, 562.5901412251667
     distance = np.sqrt((mouse_pos['smoothed_position_x'] - x_o) ** 2 + (mouse_pos['smoothed_position_y'] - y_o) ** 2)
     mouse_pos['r'] = distance
     
@@ -94,7 +94,7 @@ def Radius(mouse_pos):
 
 def PositionInArena(mouse_pos):
     distance = mouse_pos['r'].to_numpy()
-    r = 508.9626404164694
+    r = 468.9626404164694
 
     mouse_pos['Arena'] = np.where(distance < r, 1, 0)
     

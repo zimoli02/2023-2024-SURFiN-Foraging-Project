@@ -347,8 +347,6 @@ def DataInArena(id, n, denoise):
     
 def DirectionInArena(id, n, denoise):
     mouse_pos = GetStates(id, n, denoise=denoise)
-    mouse_pos = patch.PositionInArena(mouse_pos)
-    
     
     mouse_pos = mouse_pos[mouse_pos['Arena'] == 1]
     
@@ -387,21 +385,23 @@ def DirectionInArena(id, n, denoise):
     plt.tight_layout()
     plt.savefig('../FigureResults/ExampleDirection_Arena.png')
     plt.show()
+    
+    
 
 def main():
     ID = 1
     N = 6
     #FindModels()
     
-    DisplayLikelihood()
-    FitExampleSession(id = ID, n = N)
+    #DisplayLikelihood()
+    #FitExampleSession(id = ID, n = N)
     
-    DisplayExampleSessionPosition(id = ID, n = N, denoise = False)
-    DisplayExampleSessionPosition_Speed(id = ID, n = N, denoise=False)
-    DisplayExampleSessionPosition_Acce(id = ID, n = N, denoise = False)
-    Pellets(id = ID, n=N)
-    DisplayExampleSessionTransM(id = ID, n= N, raw = False, denoise=True)
-    DisplayExampleSessionState(id = ID, n=N, denoise = True)
+    #DisplayExampleSessionPosition(id = ID, n = N, denoise = False)
+    #DisplayExampleSessionPosition_Speed(id = ID, n = N, denoise=False)
+    #DisplayExampleSessionPosition_Acce(id = ID, n = N, denoise = False)
+    #Pellets(id = ID, n=N)
+    #DisplayExampleSessionTransM(id = ID, n= N, raw = False, denoise=True)
+    #DisplayExampleSessionState(id = ID, n=N, denoise = True)
     
     DataInArena(id = ID, n = N, denoise=False)
     DirectionInArena(id = ID, n = N, denoise=False)
