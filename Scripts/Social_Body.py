@@ -118,8 +118,8 @@ def Get_Data(Type, Mouse):
         x = pd.read_parquet('../SocialData/RawData/' + start + '_x.parquet', engine='pyarrow')
         y = pd.read_parquet('../SocialData/RawData/' + start + '_y.parquet', engine='pyarrow')
         if mouse == Mouse and type == Type: 
-            data_x.append(x[::5])
-            data_y.append(y[::5])
+            data_x.append(x)
+            data_y.append(y)
     
     data_x = pd.concat(data_x, ignore_index=False)
     data_y = pd.concat(data_y, ignore_index=False)

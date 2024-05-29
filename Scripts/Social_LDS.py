@@ -19,33 +19,11 @@ import Functions.inference as inference
 
 INFO = pd.read_parquet('../SocialData/INFO3.parquet', engine='pyarrow')
 
-def Infer_Parameters(start):
-    try:
-        mouse_pos = pd.read_parquet('../SocialData/LDSData/' + start + '.parquet', engine='pyarrow')
-    except FileNotFoundError:
-        ProcessLDSData()
-    
-    obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())[:, :20*60*10]
-    np.save('../SocialData/LDS_Parameters/' + start + '_OBS.npy', obs)
-    
-    P = np.load('../SocialData/LDS_Parameters/ManualParameters.npz', allow_pickle=True)
-    sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, V0, Z, R = P['sigma_a'].item(), P['sigma_x'].item(), P['sigma_y'].item(), P['sqrt_diag_V0_value'].item(), P['B'], P['Qe'], P['m0'], P['V0'], P['Z'], P['R']
-
-    #First 20 min of the data
-    sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, m0, V0, Z, R = kinematics.LDSParameters_Learned(obs, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z)
-    np.savez('../SocialData/LDS_Parameters/' + start + '_Parameters.npz', sigma_a = sigma_a, sigma_x = sigma_x, sigma_y = sigma_y, sqrt_diag_V0_value = sqrt_diag_V0_value, B = B, Qe = Qe, m0 = m0, V0 = V0, Z = Z, R = R)
-    print('parameters')
-
-
 def CenterOfMass(data_x, data_y):
-    means_x = data_x.mean(axis=1, skipna=True)
-    means_y = data_y.mean(axis=1, skipna=True)
-    mouse_pos = pd.DataFrame({'x': means_x, 'y': means_y})
-    
-    temp_df = mouse_pos.dropna(subset=['x', 'y'])
-    first_valid_index, last_valid_index = temp_df.index[0], temp_df.index[-1]
-    mouse_pos = mouse_pos.loc[first_valid_index:last_valid_index]
-    
+    x = data_x['spine2']
+    y = data_y['spine2']
+    mouse_pos = pd.DataFrame({'x': x, 'y': y})
+
     return mouse_pos
 
 
@@ -59,11 +37,27 @@ def ProcessLDSData():
             data_y = pd.read_parquet('../SocialData/RawData/' + start + '_y.parquet', engine='pyarrow')
             
             mouse_pos = CenterOfMass(data_x, data_y)
-            mouse_pos = mouse_pos[::5]
             mouse_pos = kinematics.FixNan(mouse_pos, dt = '0.1S')
             
             mouse_pos.to_parquet('../SocialData/LDSData/' + start + '.parquet', engine='pyarrow')
-        
+
+
+def Infer_Parameters(start):
+    try:
+        mouse_pos = pd.read_parquet('../SocialData/LDSData/' + start + '.parquet', engine='pyarrow')
+    except FileNotFoundError:
+        ProcessLDSData()
+    
+    #First 20 min of the data, 10Hz
+    obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())[:, :20*60*10]
+    np.save('../SocialData/LDS_Parameters/' + start + '_OBS.npy', obs)
+    
+    P = np.load('../SocialData/LDS_Parameters/ManualParameters.npz', allow_pickle=True)
+    sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, V0, Z, R = P['sigma_a'].item(), P['sigma_x'].item(), P['sigma_y'].item(), P['sqrt_diag_V0_value'].item(), P['B'], P['Qe'], P['m0'], P['V0'], P['Z'], P['R']
+
+    sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, m0, V0, Z, R = kinematics.LDSParameters_Learned(obs, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z)
+    np.savez('../SocialData/LDS_Parameters/' + start + '_Parameters.npz', sigma_a = sigma_a, sigma_x = sigma_x, sigma_y = sigma_y, sqrt_diag_V0_value = sqrt_diag_V0_value, B = B, Qe = Qe, m0 = m0, V0 = V0, Z = Z, R = R)
+    
 
 def Get_Parameters():
     for i in range(len(INFO)):
@@ -103,6 +97,7 @@ def Get_Inference():
         except FileNotFoundError:
             Inference(start)
 
+
 def Display():
     for i in range(len(INFO)):
         start, end = INFO.loc[i, 'Start'], INFO.loc[i, 'End']
@@ -137,7 +132,7 @@ def Display():
         plt.show()'''
             
 
-
+wo
 def main():
     
     
@@ -146,7 +141,7 @@ def main():
     
 
         
-    ProcessLDSData()
+    #ProcessLDSData()
     Get_Parameters()
     Get_Inference()
     Display()

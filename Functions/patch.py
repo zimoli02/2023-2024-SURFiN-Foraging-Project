@@ -85,7 +85,7 @@ def PositionInPatch(mouse_pos, r = 30):
     
     return mouse_pos
 
-def Radius(mouse_pos):
+def Radius(mouse_pos, x_o = 738.7019332885742, y_o = 562.5901412251667):
     x_o, y_o = 738.7019332885742, 562.5901412251667
     distance = np.sqrt((mouse_pos['smoothed_position_x'] - x_o) ** 2 + (mouse_pos['smoothed_position_y'] - y_o) ** 2)
     mouse_pos['r'] = distance
@@ -101,30 +101,19 @@ def PositionInArena(mouse_pos):
     return mouse_pos
     
         
-def InPatch(mouse_pos, r = 30, interval = 5):
-    Patch1, Patch2 = [554,832],[590.25, 256.75]
-    
-    # Calculate distances
-    distance1 = np.sqrt((mouse_pos['smoothed_position_x'] - Patch1[0]) ** 2 + (mouse_pos['smoothed_position_y'] - Patch1[1]) ** 2)
-    distance2 = np.sqrt((mouse_pos['smoothed_position_x'] - Patch2[0]) ** 2 + (mouse_pos['smoothed_position_y'] - Patch2[1]) ** 2)
-    
-    # Calssify
-    mouse_pos['Patch1'] = np.where(distance1 < r, 1, 0)
-    mouse_pos['Patch2'] = np.where(distance2 < r, 1, 0)
-    
-    # Fix Classification
-    groups = mouse_pos['Patch1'].ne(mouse_pos['Patch1'].shift()).cumsum()
-    zeros_groups = mouse_pos[mouse_pos['Patch1'] == 0].groupby(groups)['Patch1']
-    for name, group in zeros_groups:
-        duration = group.index[-1] - group.index[0]
-        if duration < pd.Timedelta(seconds=interval): mouse_pos.loc[group.index, 'Patch1'] = 1
+def InPatch(mouse_pos, r = 30, interval = 5, patch_loc = [[554,832],[590.25, 256.75]]):
+    for i in range(len(patch_loc)):
+        distance = np.sqrt((mouse_pos['smoothed_position_x'] - patch_loc[i][0]) ** 2 + (mouse_pos['smoothed_position_y'] - patch_loc[i][1]) ** 2)
+        patch = 'Patch' + str(i)
+        mouse_pos[patch] = np.where(distance < r, 1, 0)
         
-    groups = mouse_pos['Patch2'].ne(mouse_pos['Patch2'].shift()).cumsum()
-    zeros_groups = mouse_pos[mouse_pos['Patch2'] == 0].groupby(groups)['Patch2']
-    for name, group in zeros_groups:
-        duration = group.index[-1] - group.index[0]
-        if duration < pd.Timedelta(seconds=interval): mouse_pos.loc[group.index, 'Patch2'] = 1
+        groups = mouse_pos[patch].ne(mouse_pos[patch].shift()).cumsum()
+        zeros_groups = mouse_pos[mouse_pos[patch] == 0].groupby(groups)[patch]
+        for name, group in zeros_groups:
+            duration = group.index[-1] - group.index[0]
+            if duration < pd.Timedelta(seconds=interval): mouse_pos.loc[group.index, patch] = 1
 
+    return mouse_pos
         
 
 def MoveWheel(start, end, patch = 'Patch1', interval_seconds = 10):
