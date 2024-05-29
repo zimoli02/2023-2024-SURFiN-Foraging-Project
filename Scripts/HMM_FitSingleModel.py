@@ -28,8 +28,8 @@ sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
 short_sessions = sessions.iloc[[4,16,17,20,23,24,25,28,29,30,31]]
 long_sessions = sessions.iloc[[8, 10, 11, 14]]
 
-feature = ['smoothed_speed', 'smoothed_acceleration']
-color_names = ["blue","red","yellow", "green","brown","purple","orange", "black"]
+feature = ['smoothed_speed', 'smoothed_acceleration','r']
+color_names = ['black', "blue", "red", "tan", "green", "brown", "purple", "orange", 'turquoise', "black"]
 
 def ShortSessionModel(id = 7, n=5):
     N = n
@@ -51,7 +51,7 @@ def ShortSessionModel(id = 7, n=5):
 def FitModelsShort(hmm, index, n=5):
     N = n 
     
-    X, Y, SPEED, ACCE, VISIT_1, VISIT_2 = [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)]
+    X, Y, SPEED, ACCE, VISIT_1, VISIT_2, R = [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)]
     HEATMAP = [[] for _ in range(N)]
     
     for session, j in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
@@ -73,6 +73,7 @@ def FitModelsShort(hmm, index, n=5):
         acceleration = mouse_pos['smoothed_acceleration']
         VisitPatch1 = mouse_pos['Patch1']
         VisitPatch2 = mouse_pos['Patch2']
+        r = mouse_pos['r']
             
         for i in range(N):
             X[i] = np.concatenate([X[i], x[states==i]])
@@ -81,6 +82,7 @@ def FitModelsShort(hmm, index, n=5):
             ACCE[i] = np.concatenate([ACCE[i], acceleration[states == i]])
             VISIT_1[i] = np.concatenate([VISIT_1[i], VisitPatch1[states == i]])
             VISIT_2[i] = np.concatenate([VISIT_2[i], VisitPatch2[states == i]])
+            R[i] = np.concatenate([R[i], r[states==i]])
             
         '''fig, axs = plt.subplots(1, N, figsize = (N*8-2,6))
         for i in range(N):
@@ -136,14 +138,15 @@ def FitModelsShort(hmm, index, n=5):
     plt.show()
 
     # Speed, Acceleration, Visits in Patch 1, Visits in Patch 2
-    fig, axs = plt.subplots(4, 1, figsize = (10, 4*7-1))
-    DATA = [SPEED, ACCE, VISIT_1, VISIT_2]
-    FEATURE = ['SPEED', 'ACCE', 'VISIT_1', 'VISIT_2']
+    
+    DATA = [SPEED, ACCE, VISIT_1, VISIT_2, R]
+    FEATURE = ['SPEED', 'ACCE', 'VISIT_1', 'VISIT_2', 'R']
+    fig, axs = plt.subplots(len(FEATURE), 1, figsize = (10, len(FEATURE)*7-1))
     for data, i in zip(DATA, range(len(DATA))):
         means = [np.mean(arr) for arr in data]
-        std_devs = [np.std(arr) for arr in data]
-        axs[i].bar(range(N), means, yerr=std_devs, capsize=5)
-        axs[i].set_xticks(range(0, N), [str(i) for i in range(N)])
+        var = [np.std(arr)/np.sqrt(len(arr)) for arr in data]
+        axs[i].bar(range(N), means, yerr=var, capsize=5)
+        axs[i].set_xticks(range(0, N), [str(j) for j in range(N)])
         axs[i].set_ylabel(FEATURE[i])
     plt.savefig('../Images/HMM_Data/ShortDataUnit.png')
     plt.show()
@@ -260,8 +263,8 @@ def FitModelsLong(hmm, index, n=8):
 
 def main():
     
-    hmm, index = ShortSessionModel(id = 5, n = 5)
-    FitModelsShort(hmm, index, n = 5)
+    hmm, index = ShortSessionModel(id = 0, n = 9)
+    FitModelsShort(hmm, index, n = 9)
     
     #hmm, index = LongSessionModel()
     #FitModelsLong(hmm, index)

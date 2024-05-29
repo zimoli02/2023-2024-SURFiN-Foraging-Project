@@ -35,12 +35,12 @@ def WallError(last_positions, next_positions):
     else: return False
 
 
-def FixNan(mouse_pos):
+def FixNan(mouse_pos, dt):
     df = mouse_pos.copy()
     nan_blocks = df['x'].isna()
 
     for group, data in mouse_pos[nan_blocks].groupby((nan_blocks != nan_blocks.shift()).cumsum()):
-        latest_valid_index = mouse_pos.loc[:data.index[0]-pd.Timedelta('0.018S'), 'x'].last_valid_index()
+        latest_valid_index = mouse_pos.loc[:data.index[0]-(pd.Timedelta(dt)-pd.Timedelta('0.002S')), 'x'].last_valid_index()
         latest_valid_values = mouse_pos.loc[latest_valid_index, ['x', 'y']].values
         
         if len(data) == 1:
@@ -48,7 +48,7 @@ def FixNan(mouse_pos):
             df.loc[data.index, 'y'] = latest_valid_values[1]
             
         else:    
-            next_valid_index = mouse_pos.loc[data.index[-1]+pd.Timedelta('0.018S'):].first_valid_index()
+            next_valid_index = mouse_pos.loc[data.index[-1]+(pd.Timedelta(dt)-pd.Timedelta('0.002S')):].first_valid_index()
             next_valid_values = mouse_pos.loc[next_valid_index, ['x', 'y']].values
             
             duration = (data.index[-1] - latest_valid_index).total_seconds()
@@ -271,8 +271,8 @@ def LDSParameters_Learned(y, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Q
     return sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value[0], B, m0, V0, Z, R
 
 
-def AddKinematics(title, mouse_pos):
-    smoothRes = np.load('../Data/ProcessedMouseKinematics/' + title+'smoothRes.npz')
+def AddKinematics(smoothRes, mouse_pos):
+    #smoothRes = np.load('../Data/ProcessedMouseKinematics/' + title+'smoothRes.npz')
     mouse_pos['smoothed_position_x'] = pd.Series(smoothRes['xnN'][0][0], index=mouse_pos.index)
     mouse_pos['smoothed_position_y'] = pd.Series(smoothRes['xnN'][3][0], index=mouse_pos.index)
     mouse_pos['smoothed_velocity_x'] = pd.Series(smoothRes['xnN'][1][0], index=mouse_pos.index)

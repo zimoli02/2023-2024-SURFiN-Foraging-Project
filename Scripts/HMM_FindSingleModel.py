@@ -44,6 +44,7 @@ def FindModelsShort():
             title = 'ShortSession'+str(k)
             mouse_pos = pd.read_parquet('../Data/MousePos/' + title + 'mousepos.parquet', engine='pyarrow')
             dfs.append(mouse_pos)
+        
         MOUSE_POS = dfs[0]
         for df in dfs[1:]: MOUSE_POS = MOUSE_POS.add(df, fill_value=0)
         
@@ -55,16 +56,16 @@ def FindModelsShort():
         for n in N:
             hmm, states, transition_mat, lls = HMM.FitHMM(obs, num_states = n, n_iters = 50)
             ll = hmm.log_likelihood(OBS)
-            LL.append(ll)
+            LL.append(ll/len(OBS[0]))
         
         LogLikelihood.append(LL)
-        np.save('../Data/HMMStates/LL_3.npy', LogLikelihood)
+        np.save('../Data/HMMStates/LL_4.npy', LogLikelihood)
 
 
 def DisplayModelsShort():
     N = np.arange(3,28,1)
-    LogLikelihood = np.load('../Data/HMMStates/LL_3.npy', allow_pickle=True)
-    '''
+    LogLikelihood = np.load('../Data/HMMStates/LL_4.npy', allow_pickle=True)
+    
     for i in range(len(LogLikelihood)):
         title = 'ShortSession' + str(i)
         LL = LogLikelihood[i]
@@ -75,7 +76,7 @@ def DisplayModelsShort():
         axs.set_xticks(N)
         plt.savefig('../Images/HMM_StateChoice/' + title+'.png')
         plt.show()
-    '''
+    
         
     fig, axs = plt.subplots(1,1,figsize = (10,7))
     for i in range(len(LogLikelihood)):
@@ -83,12 +84,12 @@ def DisplayModelsShort():
         axs.scatter(N, LL)
         axs.plot(N, LL, color = 'black')
     axs.set_xticks(N)
-    plt.savefig('../Images/HMM_StateChoice/Summary_3.png')
+    plt.savefig('../Images/HMM_StateChoice/Summary_4.png')
     plt.show()
 
 def main():
     # For short sessions:
-    FindModelsShort()
+    #FindModelsShort()
     DisplayModelsShort()
     
     # For long sessions

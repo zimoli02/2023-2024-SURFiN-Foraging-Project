@@ -32,9 +32,10 @@ def Display(session, title):
     mouse_pos = api.load(root, exp02.CameraTop.Position, start=start, end=end)
     
     mouse_pos = kinematics.ProcessRawData(mouse_pos, root, start, end, exclude_maintenance=True, fix_nan=False, fix_nest=False)
+    smoothRes = np.load('../Data/ProcessedMouseKinematics/' + title+'smoothRes.npz')
         
     # Add smoothed kinematics data to mouse_pos
-    kinematics.AddKinematics(title, mouse_pos)
+    kinematics.AddKinematics(smoothRes, mouse_pos)
         
     #mouse_pos = mouse_pos.dropna(subset=['x'])
         

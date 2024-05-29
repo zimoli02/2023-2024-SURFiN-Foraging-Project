@@ -28,7 +28,8 @@ sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
 short_sessions = sessions.iloc[[4,16,17,20,23,24,25,28,29,30,31]]
 long_sessions = sessions.iloc[[8, 10, 11, 14]]
 
-feature = ['smoothed_speed', 'smoothed_acceleration']
+feature = ['smoothed_speed', 'smoothed_acceleration', 'r']
+color_names = ['black', "blue", "red", "tan", "green", "brown", "purple", "orange", "black", 'turquoise']
 
 def FitModelsShort(n=5):
     N = n
@@ -70,7 +71,7 @@ def FitModelsShort(n=5):
             VISIT_1[i] = np.concatenate([VISIT_1[i], VisitPatch1[states == i]])
             VISIT_2[i] = np.concatenate([VISIT_2[i], VisitPatch2[states == i]])
             
-        fig, axs = plt.subplots(1, N, figsize = (N*8-2,6))
+        '''fig, axs = plt.subplots(1, N, figsize = (N*8-2,6))
         for i in range(N):
             heatmap, xedges, yedges, img = axs[i].hist2d(x[states == i], y[states == i], bins=[50, 50], range=[[215, 1235], [65, 1065]], cmap='binary', density=True)
             heatmap = np.nan_to_num(heatmap)
@@ -81,9 +82,23 @@ def FitModelsShort(n=5):
             axs[i].set_xlabel('X')
             axs[i].set_ylabel('Y')
         plt.savefig('../Images/HMM_Heatmap/' + title+'.png')
+        plt.show()'''
+        
+        fig, axs = plt.subplots(1, N, figsize = (N*8-2,6))
+        for i in range(N):
+            axs[i].scatter(x[states == i], y[states == i], color = color_names[i], s = 2, alpha = 0.5)
+            axs[i].set_xlim(145, 1250)
+            axs[i].set_ylim(50, 1080)
+            axs[i].set_aspect('equal', adjustable='box')
+            axs[i].set_xlabel('X (px)')
+        axs[0].set_ylabel('Y (px)')
+        plt.tight_layout()
+        plt.savefig('../Images/HMM_Heatmap/' + title+'.png')
         plt.show()
 
 
+
+    '''    
     fig, axs = plt.subplots(2, N, figsize = (N*8-2,14))
     for i in range(N):
         combined_heatmaps = np.array(HEATMAP[i])
@@ -100,7 +115,7 @@ def FitModelsShort(n=5):
         axs[1,i].set_xlabel('X')
         axs[0,i].set_title('State' + str(i))    
     plt.savefig('../Images/HMM_Heatmap/ShortAverage.png')
-    plt.show()
+    plt.show()'''
 
     # Speed, Acceleration, Visits in Patch 1, Visits in Patch 2
     fig, axs = plt.subplots(4, 1, figsize = (10, 4*7-1))
@@ -108,9 +123,9 @@ def FitModelsShort(n=5):
     FEATURE = ['SPEED', 'ACCE', 'VISIT_1', 'VISIT_2']
     for data, i in zip(DATA, range(len(DATA))):
         means = [np.mean(arr) for arr in data]
-        std_devs = [np.std(arr) for arr in data]
-        axs[i].bar(range(N), means, yerr=std_devs, capsize=5)
-        axs[i].set_xticks(range(0, 5),[str(i) for i in range(N)])
+        var = [np.std(arr)/np.sqrt(len(arr)) for arr in data]
+        axs[i].bar(range(N), means, yerr=var, capsize=5)
+        axs[i].set_xticks(range(0, N),[str(i) for i in range(N)])
         axs[i].set_ylabel(FEATURE[i])
     plt.savefig('../Images/HMM_Data/ShortDataAverage.png')
     plt.show()
@@ -210,7 +225,7 @@ def FitModelsLong(n=8):
 
 def main():
     # For short sessions:
-    FitModelsShort()
+    FitModelsShort(n=7)
     
     # For long sessions
     #FitModelsLong()

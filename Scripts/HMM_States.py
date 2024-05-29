@@ -30,10 +30,10 @@ sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
 short_sessions = sessions.iloc[[4,16,17,20,23,24,25,28,29,30,31]]
 long_sessions = sessions.iloc[[8, 10, 11, 14]]
 
-feature = ['smoothed_speed', 'smoothed_acceleration']
+feature = ['smoothed_speed', 'smoothed_acceleration', 'r']
+color_names = ['black', "blue", "red", "tan", "green", "brown", "purple", "orange", 'turquoise', "black"]
 
 def PlotStatesWithTime(states, mouse_pos, type, N, axs):
-    color_names = ["blue","red","yellow", "green","brown","purple","orange","black"]
     colors = sns.xkcd_palette(color_names[0:N])
     cmap = gradient_cmap(colors)
 
@@ -75,8 +75,8 @@ def PlotStates(mouse_pos, states, title, n):
         
 
     fig, axs = plt.subplots(2, 1, figsize=(35, 8))
-    cax, axs[0] = PlotStatesWithTime(states, mouse_pos, type = 'States', N=5, axs = axs[0])
-    cax, axs[1] = PlotStatesWithTime(np.array(states_), states_prob, type = 'States Prob.', N=5, axs = axs[1])
+    cax, axs[0] = PlotStatesWithTime(states, mouse_pos, type = 'States', N = N, axs = axs[0])
+    cax, axs[1] = PlotStatesWithTime(np.array(states_), states_prob, type = 'States Prob.', N = N, axs = axs[1])
         
     cbar = fig.colorbar(cax, ax=axs, orientation='vertical')
     cbar.set_ticks(np.arange(0, N))
@@ -134,7 +134,7 @@ def PlotStatesLong(n=8):
     
 
 def main():
-    PlotStatesShort()
+    PlotStatesShort(n=9)
     #PlotStatesLong()
     
 

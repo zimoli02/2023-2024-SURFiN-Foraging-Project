@@ -11,6 +11,7 @@ from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.preprocessing import StandardScaler
 import statsmodels.api as sm
+from collections import Counter
 
 import sys
 import os
@@ -43,8 +44,9 @@ def ConcatenateSessions():
         dfs.append(Visits_Patch1)
         dfs.append(Visits_Patch2)
         
-    VISIT = pd.concat(dfs, ignore_index=False)
+    VISIT = pd.concat(dfs, ignore_index=True)
     VISIT = VISIT[VISIT['distance'] >= 0.1]
+    VISIT = VISIT.reset_index(drop=True)
     VISIT['interc'] = 1
     
     return VISIT
@@ -156,7 +158,7 @@ def PrintModelSummary(result, TYPE):
     plt.show()   
 
 def FitModels(VISIT, TYPES, PREDICTOR):
-    X, Y = Variables(VISIT, feature = ['speed','acceleration', 'PelletsInLastVisitSelf', 'PelletsInLastVisitOther', 'IntervalLastVisit' ,'entry'], predictor=PREDICTOR)
+    X, Y = Variables(VISIT, feature = ['speed','acceleration', 'PelletsInLastVisitSelf', 'PelletsInLastVisitOther', 'IntervalLastVisit' ,'entry','1','3','5','6','7','8'], predictor=PREDICTOR)
     
     for TYPE in TYPES:
         result, y_pred, average_mse = Model(X, Y, type = TYPE)
@@ -166,11 +168,51 @@ def FitModels(VISIT, TYPES, PREDICTOR):
         PlotModelPrediction_Scatter(Y, y_pred, predictor=PREDICTOR, TYPE = TYPE)
         PrintModelSummary(result, TYPE)
 
+def addstates(n=9, pre_seconds = '30S'):
+    VISITS = []
+    for session, j in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
+        title = 'ShortSession'+str(j)
+        
+        mouse_pos = pd.read_parquet('../Data/MousePos/' + title + 'mousepos.parquet', engine='pyarrow')
+        states = np.load('../Data/HMMStates/'+ title + 'States_Unit.npy', allow_pickle=True)
+        mouse_pos['states'] = pd.Series(states, index = mouse_pos.index)
+        
+        Visits_Patch1 = pd.read_parquet('../Data/RegressionPatchVisits/' + title + 'Visit1.parquet', engine='pyarrow')
+        Visits_Patch2 = pd.read_parquet('../Data/RegressionPatchVisits/' + title + 'Visit2.parquet', engine='pyarrow')
+        VISIT = pd.concat([Visits_Patch1,Visits_Patch2], ignore_index=True)
+        VISIT = VISIT[VISIT['distance'] >= 0.1]
+        VISIT = VISIT.reset_index(drop=True)
+        
+        for i in range(n):
+            VISIT[str(i)] = 0
+        
+        for i in range(len(VISIT)):
+            trigger = VISIT.iloc[i]['start']
+            
+            latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta(pre_seconds + '1S'):trigger, 'states'].index
+            latest_valid_state = mouse_pos.loc[latest_valid_index, ['states']].values.reshape(-1)
+            if len(latest_valid_state) >= 10*int(pre_seconds[0:2]): latest_valid_state  = latest_valid_state[-10*int(pre_seconds[0:2]):]
+            
+            count = Counter(latest_valid_state)
+            for k in count.items():
+                state, frequency = k
+                VISIT.loc[i,str(state)] = frequency/len(latest_valid_state)
+            
+        VISITS.append(VISIT)
+        
+    VISITS = pd.concat(VISITS, ignore_index=True)
+    return VISITS
+
 
 def main():
     TYPES = ['Poisson', 'Gaussian', 'Gamma']
     PREDICTOR = 'distance'
-    VISIT = pd.read_parquet('../Data/RegressionPatchVisits/VISIT.parquet', engine='pyarrow')
+    
+    AddStates = True
+    if AddStates:
+        VISIT = addstates(n=9)
+    else:
+        VISIT = pd.read_parquet('../Data/RegressionPatchVisits/VISIT.parquet', engine='pyarrow')
     
     FitModels(VISIT, TYPES, PREDICTOR)
 
