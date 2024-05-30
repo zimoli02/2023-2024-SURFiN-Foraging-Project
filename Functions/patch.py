@@ -21,6 +21,7 @@ import aeon
 import aeon.io.api as api
 from aeon.io import reader, video
 from aeon.schema.dataset import exp02
+from aeon.schema.schemas import social02
 from aeon.analysis.utils import visits, distancetravelled
 
 root = [Path("/ceph/aeon/aeon/data/raw/AEON2/experiment0.2")]
@@ -92,11 +93,9 @@ def Radius(mouse_pos, x_o = 738.7019332885742, y_o = 562.5901412251667):
     
     return mouse_pos
 
-def PositionInArena(mouse_pos):
+def PositionInArena(mouse_pos, arena_r = 468.9626404164694):
     distance = mouse_pos['r'].to_numpy()
-    r = 468.9626404164694
-
-    mouse_pos['Arena'] = np.where(distance < r, 1, 0)
+    mouse_pos['Arena'] = np.where(distance < arena_r, 1, 0)
     
     return mouse_pos
     
@@ -114,7 +113,6 @@ def InPatch(mouse_pos, r = 30, interval = 5, patch_loc = [[554,832],[590.25, 256
             if duration < pd.Timedelta(seconds=interval): mouse_pos.loc[group.index, patch] = 1
 
     return mouse_pos
-        
 
 def MoveWheel(start, end, patch = 'Patch1', interval_seconds = 10):
     if patch == 'Patch1': encoder = api.load(root, exp02.Patch1.Encoder, start=start, end=end)
@@ -136,29 +134,51 @@ def MoveWheel(start, end, patch = 'Patch1', interval_seconds = 10):
     return encoder
 
 
-def EnterArena(mouse_pos):
-    mouse_pos = PositionInArena(mouse_pos)
+def Social_MoveWheel(start, end, patch = 'Patch1', interval_seconds = 10):
+    if patch == 'Patch1': encoder = api.load(root, social02.Patch1.Encoder, start=start, end=end)
+    elif patch == 'Patch2': encoder = api.load(root, social02.Patch2.Encoder, start=start, end=end)
+    else: encoder = api.load(root, social02.Patch3.Encoder, start=start, end=end)
+    
+    w = -distancetravelled(encoder.angle).to_numpy()
+    dw = np.concatenate((np.array([0]), w[:-1]- w[1:]))
+    encoder['Distance'] = pd.Series(w, index=encoder.index)
+    encoder['DistanceChange'] = pd.Series(dw, index=encoder.index)
+    encoder['DistanceChange'] = encoder['DistanceChange'].rolling('10S').mean()
+    encoder['Move'] = np.where(encoder.DistanceChange > 0.001, 1, 0)
+    
+    if interval_seconds < 0.01: return encoder
+    groups = encoder['Move'].ne(encoder['Move'].shift()).cumsum()
+    zeros_groups = encoder[encoder['Move'] == 0].groupby(groups)['Move']
+    for name, group in zeros_groups:
+        duration = group.index[-1] - group.index[0]
+        if duration < pd.Timedelta(seconds=interval_seconds): encoder.loc[group.index, 'Move'] = 1
+    return encoder
+
+
+def EnterArena(mouse_pos, arena_r):
+    mouse_pos = PositionInArena(mouse_pos, arena_r)
     InArena = mouse_pos.Arena.to_numpy()
 
     return mouse_pos.iloc[np.where(InArena < 1)].index
 
 
-def Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10):
+def Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10, arena_r = 468.9626404164694):
     encoder = MoveWheel(mouse_pos.index[0], mouse_pos.index[-1], patch = patch)
         
-    entry = EnterArena(mouse_pos)
+    entry = EnterArena(mouse_pos, arena_r)
         
-    Visits = {'start':[],'end':[], 'distance':[], 'duration':[], 'speed':[], 'speed_x':[], 'speed_y':[], 'acceleration':[], 'acceleration_x':[], 'acceleration_y':[], 'weight':[],'entry':[]}
+    Visits = {'start':[],'end':[], 'distance':[], 'duration':[], 'speed':[], 'acceleration':[], 'entry':[], 'patch':[], 'pellet':[]}
     
     groups = encoder['Move'].ne(encoder['Move'].shift()).cumsum()
     visits = encoder[encoder['Move'] == 1].groupby(groups)['Move']
     for name, group in visits:
-        Visits['start'].append(group.index[0])
-        Visits['end'].append(group.index[-1])
-        Visits['duration'].append((group.index[-1]-group.index[0]).total_seconds())
-        Visits['distance'].append(encoder.loc[group.index[0], 'Distance']-encoder.loc[group.index[-1], 'Distance'])
+        start, end = group.index[0], group.index[-1]
+        Visits['start'].append(start)
+        Visits['end'].append(end)
+        Visits['duration'].append((end-start).total_seconds())
+        Visits['distance'].append(encoder.loc[start, 'Distance']-encoder.loc[end, 'Distance'])
             
-        pre_end = group.index[0]
+        pre_end = start
         pre_start = pre_end - pd.Timedelta(seconds = pre_period_seconds)
         if pre_start < mouse_pos.index[0]: pre_start = mouse_pos.index[0]
         
@@ -170,63 +190,95 @@ def Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10):
         pre_visit_data = mouse_pos.loc[pre_start:pre_end]
         
         Visits['speed'].append(pre_visit_data['smoothed_speed'].mean())
-        Visits['speed_x'].append(pre_visit_data['smoothed_velocity_x'].mean())
-        Visits['speed_y'].append(pre_visit_data['smoothed_velocity_y'].mean())
         Visits['acceleration'].append(pre_visit_data['smoothed_acceleration'].mean())
-        Visits['acceleration_x'].append(pre_visit_data['smoothed_acceleration_x'].mean())
-        Visits['acceleration_y'].append(pre_visit_data['smoothed_acceleration_y'].mean())
-        Visits['weight'].append(pre_visit_data['weight'].mean())
+        #Visits['weight'].append(pre_visit_data['weight'].mean())
         #Visits['state'].append(pre_visit_data['states'].value_counts().idxmax())
+        
+        Visits['patch'].append(patch)
+        
+        if patch == 'Patch1':
+            pellets = api.load(root, exp02.Patch1.DeliverPellet, start=start, end=end)
+        else:
+            pellets = api.load(root, exp02.Patch2.DeliverPellet, start=start, end=end)
 
+        Visits['pellet'].append(len(pellets))
     
     return pd.DataFrame(Visits)
 
-def VisitIntervals(Visits_Patch1, Visits_Patch2):
-        Patch1, Patch2 = True, True
-        if len(Visits_Patch1) == 0: Patch1 = False
-        if len(Visits_Patch2) == 0: Patch2 = False
+def Social_Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10, arena_r = 468.9626404164694):
+    encoder = Social_MoveWheel(mouse_pos.index[0], mouse_pos.index[-1], patch = patch)
         
-        Visits_Patch1 = Visits_Patch1.copy()
-        Visits_Patch2 = Visits_Patch2.copy()
+    entry = EnterArena(mouse_pos, arena_r)
         
-        Visits_Patch1['PelletsInLastVisitSelf'] = 0
-        Visits_Patch1['PelletsInLastVisitOther'] = 0
-        Visits_Patch1['IntervalLastVisit'] = 0
-        for i in range(1,len(Visits_Patch1)):
-                start, end = Visits_Patch1.start[i-1], Visits_Patch1.end[i-1]
-                
-                pellets_patch1 = api.load(root, exp02.Patch1.DeliverPellet, start=start, end=end)
-                Visits_Patch1.loc[i, 'PelletsInLastVisitSelf'] = len(pellets_patch1)
-                Visits_Patch1.loc[i, 'IntervalLastVisit'] = (Visits_Patch1.start[i] - end).total_seconds()
-                
-                if Patch2:
-                        prior_timestamps = Visits_Patch2[Visits_Patch2['end'] < Visits_Patch1.start[i]]
-                        if not prior_timestamps.empty:
-                                start_, end_ = prior_timestamps.iloc[-1]['start'], prior_timestamps.iloc[-1]['end']
-                                pellets_patch2 = api.load(root, exp02.Patch2.DeliverPellet, start=start_, end=end_)
-                                Visits_Patch1.loc[i, 'PelletsInLastVisitOther'] = len(pellets_patch2)
-                                if end < end_: Visits_Patch1.loc[i, 'IntervalLastVisit'] = (Visits_Patch1.start[i] - end_).total_seconds()
+    Visits = {'start':[],'end':[], 'distance':[], 'duration':[], 'speed':[], 'acceleration':[], 'weight':[],'entry':[], 'patch':[], 'pellet':[]}
+    
+    groups = encoder['Move'].ne(encoder['Move'].shift()).cumsum()
+    visits = encoder[encoder['Move'] == 1].groupby(groups)['Move']
+    for name, group in visits:
+        start, end = group.index[0], group.index[-1]
+        Visits['start'].append(start)
+        Visits['end'].append(end)
+        Visits['duration'].append((end-start).total_seconds())
+        Visits['distance'].append(encoder.loc[start, 'Distance']-encoder.loc[end, 'Distance'])
+            
+        pre_end = start
+        pre_start = pre_end - pd.Timedelta(seconds = pre_period_seconds)
+        if pre_start < mouse_pos.index[0]: pre_start = mouse_pos.index[0]
         
-                
-        Visits_Patch2['PelletsInLastVisitSelf'] = 0
-        Visits_Patch2['PelletsInLastVisitOther'] = 0
-        Visits_Patch2['IntervalLastVisit'] = 0
-        for i in range(1,len(Visits_Patch2)):
-                start, end = Visits_Patch2.start[i-1], Visits_Patch2.end[i-1]
+        index = entry.searchsorted(pre_end, side='left') - 1
+        index = max(index, 0)
+        #last_enter = entry[index]
+        Visits['entry'].append((pre_end - entry[index]).total_seconds())
+            
+        pre_visit_data = mouse_pos.loc[pre_start:pre_end]
+        
+        Visits['speed'].append(pre_visit_data['smoothed_speed'].mean())
+        Visits['acceleration'].append(pre_visit_data['smoothed_acceleration'].mean())
+        #Visits['weight'].append(pre_visit_data['weight'].mean())
+        #Visits['state'].append(pre_visit_data['states'].value_counts().idxmax())
+        
+        Visits['patch'].append(patch)
+        
+        if patch == 'Patch1':
+            pellets = api.load(root, social02.Patch1.DeliverPellet, start=start, end=end)
+        elif patch == 'Patch2':
+            pellets = pellets = api.load(root, social02.Patch1.DeliverPellet, start=start, end=end)
+        else: 
+            pellets = pellets = api.load(root, social02.Patch1.DeliverPellet, start=start, end=end)
+        Visits['pellet'].append(pellets)
+    
+    return pd.DataFrame(Visits)
 
-                pellets_patch2 = api.load(root, exp02.Patch2.DeliverPellet, start=start, end=end)
-                Visits_Patch2.loc[i, 'PelletsInLastVisitSelf'] = len(pellets_patch2)
-                Visits_Patch2.loc[i, 'IntervalLastVisit'] = (Visits_Patch2.start[i] - end).total_seconds()
-                
-                if Patch1:
-                        prior_timestamps = Visits_Patch1[Visits_Patch1['end'] < Visits_Patch2.start[i]]
-                        if not prior_timestamps.empty: 
-                                start_, end_ = prior_timestamps.iloc[-1]['start'], prior_timestamps.iloc[-1]['end']
-                                pellets_patch1 = api.load(root, exp02.Patch1.DeliverPellet, start=start_, end=end_)
-                                Visits_Patch2.loc[i, 'PelletsInLastVisitOther'] = len(pellets_patch1)
-                                if end < end_: Visits_Patch2.loc[i, 'IntervalLastVisit'] = (Visits_Patch2.start[i] - end_).total_seconds()
 
-        return Visits_Patch1, Visits_Patch2
+
+def VisitIntervals(Patches = []):
+    Visits = pd.concat(Patches, ignore_index=True)
+    Visits = Visits.sort_values(by='start',ignore_index=True)  
+    
+    Visits['last_pellets_self'] = 0
+    Visits['last_pellets_other'] = 0
+    Visits['interval'] = 0
+    
+    for i in range(1,len(Visits)):
+        start, end = Visits.start[i], Visits.end[i]
+        last_end = Visits.end[i-1]
+        Visits.loc[i, 'interval'] = (start - last_end).total_seconds()
+        
+        self_patch, other_patch = False, False
+        self_pellet, other_pellet = 0, 0
+        for j in range(i-1, -1, -1):
+            if self_patch and other_patch: break
+            if Visits.patch[j] != Visits.patch[i] and other_patch == False: 
+                other_pellet = Visits.pellet[j]
+                other_patch = True
+            if Visits.patch[j] == Visits.patch[i] and self_patch == False:
+                self_pellet = Visits.pellet[j]
+                self_patch = True
+        Visits.loc[i, 'last_pellets_self'] = self_pellet
+        Visits.loc[i, 'last_pellets_other'] = other_pellet
+
+    return Visits
+
 
 def VisitPatchPellets(Visits_Patch1, Visits_Patch2):
         Visits_Patch1 = Visits_Patch1.copy()

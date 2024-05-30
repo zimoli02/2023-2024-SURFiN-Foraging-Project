@@ -6,37 +6,57 @@ import pandas as pd
 import seaborn as sns
 from pathlib import Path
 
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression, Ridge
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.preprocessing import StandardScaler
-import statsmodels.api as sm
-from collections import Counter
-
 import sys
-import os
 from pathlib import Path
 
 current_script_path = Path(__file__).resolve()
+function_dir = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(function_dir))
+import Functions.patch as patch
+
 parent_dir = current_script_path.parents[2] / 'aeon_mecha' 
 sys.path.insert(0, str(parent_dir))
-
 import aeon
 import aeon.io.api as api
 from aeon.schema.dataset import exp02
 from aeon.analysis.utils import visits
+from aeon.schema.schemas import social02
 
-function_dir = current_script_path.parent.parent
-sys.path.insert(0, str(function_dir))
+nodes_name = ['nose', 'head', 'right_ear', 'left_ear', 'spine1', 'spine2','spine3', 'spine4']
 
-import Functions.patch as patch
+INFO = pd.read_parquet('../SocialData/INFO3.parquet', engine='pyarrow')
+TYPE = ['Pre','Post']
+MOUSE = ['BAA-1104045', 'BAA-1104047']
+LABELS = [
+    ['Pre','BAA-1104045'],
+    ['Pre','BAA-1104047'],
+    ['Post','BAA-1104045'],
+    ['Post','BAA-1104047']
+]
 
-root = [Path("/ceph/aeon/aeon/data/raw/AEON2/experiment0.2")]
 
-subject_events = api.load(root, exp02.ExperimentalMetadata.SubjectState)
-sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
-short_sessions = sessions.iloc[[4,16,17,20,23,24,25,28,29,30,31]]
-long_sessions = sessions.iloc[[8, 10, 11, 14]]
+def ConcatenateSessions():
+    dfs = []
+    for i in range(len(LABEL)):
+        type, mouse = LABEL[i][0], LABEL[i][1]
+        Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
+        dfs.append(Visits)
+    VISIT = pd.concat(dfs, ignore_index=False)
+    VISIT = VISIT[VISIT['distance'] >= 0.1]
+    
+    return VISIT
+
+def Procress_Visits():
+    for i in range(len(LABEL)):
+        type, mouse = LABEL[i][0], LABEL[i][1]
+        mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
+        Visits_Patch1 = patch.Social_Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 30, arena_r = 511)
+        Visits_Patch2 = patch.Social_Visits(mouse_pos, patch = 'Patch2', pre_period_seconds = 30, arena_r = 511)
+        Visits_Patch3 = patch.Social_Visits(mouse_pos, patch = 'Patch3', pre_period_seconds = 30, arena_r = 511)
+        
+        Visits = patch.VisitIntervals([Visits_Patch1, Visits_Patch2, Visits_Patch3]) 
+        Visits_Patch1.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
+
 
 def Variables(VISIT, feature, predictor = 'distance'):
     X = VISIT[feature]
@@ -58,7 +78,7 @@ def CrossValidation(X, Y, type, split_perc = 0.75):
     indices = np.arange(len(Y))
     
     MSE = []
-    MSE_max = 1e10
+    MSE_min = 1e10
     
     for i in range(1000):
         np.random.shuffle(indices)
@@ -77,17 +97,15 @@ def CrossValidation(X, Y, type, split_perc = 0.75):
         
         MSE.append(mse)
         
-        if mse < MSE_max:  
+        if mse < MSE_min:  
             result_valid = result
-            MSE_max = mse
+            MSE_min = mse
     
     return result_valid, np.mean(MSE)
         
     
 def Model(X, Y, type = 'Poisson'):
     result, average_mse = CrossValidation(X, Y, type)
-    
-    #result = model.fit()
     y_pred = result.predict(X)
     
     return result, y_pred, average_mse
@@ -109,7 +127,7 @@ def PlotModelPrediction(obs, pred, predictor = 'Distance', TYPE = 'Poisson'):
     axs[1].spines['right'].set_visible(False)
     axs[1].legend()
         
-    plt.savefig('../Images/Regression/AllSessionsModel/' + TYPE + 'Model.png')
+    plt.savefig('../Images/Social_Regression/' + TYPE + '_Prediction.png')
     plt.show()
 
 
@@ -132,7 +150,7 @@ def PlotModelPrediction_Scatter(obs, pred, predictor = 'Distance', TYPE = 'Poiss
     axs.legend(fontsize = 20)
 
     plt.tight_layout()
-    plt.savefig('../Images/Regression/AllSessionsModel/' + TYPE + 'Model_Scatter.png')
+    plt.savefig('../Images/Social_Regression/' + TYPE + '_Prediction_Scatter.png')
     plt.show()
 
 def PrintModelSummary(result, TYPE):
@@ -141,69 +159,25 @@ def PrintModelSummary(result, TYPE):
     axs.text(0.5, 0.5, str(result.summary()),
                 verticalalignment='center', horizontalalignment='left',
                 transform=axs.transAxes, fontsize=12)
-    plt.savefig('../Images/Regression/AllSessionsParams/' + TYPE + 'Summary.png')
+    plt.savefig('../Images/Social_Regression/' + TYPE + '_Model_Summary.png')
     plt.show()   
 
-def FitModels(VISIT, TYPES, PREDICTOR):
-    X, Y = Variables(VISIT, feature = ['speed','acceleration', 'last_pellets_self', 'last_pellets_other', 'interval' ,'entry'], predictor=PREDICTOR)
+
+def Fit_Models(Visits, FEATURES, MODELS, PREDICTOR):
+    X, Y = Variables(Visits, feature = FEATURES, predictor=PREDICTOR)
     
-    for TYPE in TYPES:
-        result, y_pred, average_mse = Model(X, Y, type = TYPE)
+    for MODEL in MODELS:
+        result, y_pred, average_mse = Model(X, Y, model = MODEL)
         print("Average MSE per Prediction for " + TYPE + " Model Fitted: ", average_mse)
         
-        PlotModelPrediction(Y, y_pred, predictor=PREDICTOR, TYPE = TYPE)
-        PlotModelPrediction_Scatter(Y, y_pred, predictor=PREDICTOR, TYPE = TYPE)
-        PrintModelSummary(result, TYPE)
-
-def addstates(n=9, pre_seconds = '30S'):
-    VISITS = []
-    for session, j in zip(list(short_sessions.itertuples()), range(len(short_sessions))):
-        title = 'ShortSession'+str(j)
-        
-        mouse_pos = pd.read_parquet('../Data/MousePos/' + title + 'mousepos.parquet', engine='pyarrow')
-        states = np.load('../Data/HMMStates/'+ title + 'States_Unit.npy', allow_pickle=True)
-        mouse_pos['states'] = pd.Series(states, index = mouse_pos.index)
-        
-        Visits_Patch1 = pd.read_parquet('../Data/RegressionPatchVisits/' + title + 'Visit1.parquet', engine='pyarrow')
-        Visits_Patch2 = pd.read_parquet('../Data/RegressionPatchVisits/' + title + 'Visit2.parquet', engine='pyarrow')
-        VISIT = pd.concat([Visits_Patch1,Visits_Patch2], ignore_index=True)
-        VISIT = VISIT[VISIT['distance'] >= 0.1]
-        VISIT = VISIT.reset_index(drop=True)
-        
-        for i in range(n):
-            VISIT[str(i)] = 0
-        
-        for i in range(len(VISIT)):
-            trigger = VISIT.iloc[i]['start']
-            
-            latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta(pre_seconds + '1S'):trigger, 'states'].index
-            latest_valid_state = mouse_pos.loc[latest_valid_index, ['states']].values.reshape(-1)
-            if len(latest_valid_state) >= 10*int(pre_seconds[0:2]): latest_valid_state  = latest_valid_state[-10*int(pre_seconds[0:2]):]
-            
-            count = Counter(latest_valid_state)
-            for k in count.items():
-                state, frequency = k
-                VISIT.loc[i,str(state)] = frequency/len(latest_valid_state)
-            
-        VISITS.append(VISIT)
-        
-    VISITS = pd.concat(VISITS, ignore_index=True)
-    return VISITS
-
+        PlotModelPrediction(Y, y_pred, predictor=PREDICTOR, model = MODEL)
+        PlotModelPrediction_Scatter(Y, y_pred, predictor=PREDICTOR, model = MODEL)
+        PrintModelSummary(result, MODEL)
 
 def main():
-    TYPES = ['Poisson', 'Gaussian', 'Gamma']
-    PREDICTOR = 'distance'
-    
-    AddStates = False
-    if AddStates:
-        VISIT = addstates(n=9)
-    else:
-        VISIT = pd.read_parquet('../Data/RegressionPatchVisits/VISIT.parquet', engine='pyarrow')
-    
-    FitModels(VISIT, TYPES, PREDICTOR)
-
-
+    Process_Visits()
+    Visits = ConcatenateSessions()
+    Fit_Models(Visits, FEATURES = ['speed','acceleration', 'last_pellets_self', 'last_pellets_other', 'interval' ,'entry'], MODELS = ['Poisson', 'Gaussian', 'Gamma'], PREDICTOR = 'distance')
 
 if __name__ == "__main__":
     main()

@@ -10,7 +10,8 @@ import sys
 from pathlib import Path
 
 current_script_path = Path(__file__).resolve()
-parent_dir = current_script_path.parent.parent
+#parent_dir = current_script_path.parent.parent
+parent_dir = current_script_path.parents[2] / 'aeon_mecha' 
 sys.path.insert(0, str(parent_dir))
 
 import aeon
@@ -275,6 +276,7 @@ def AddKinematics(smoothRes, mouse_pos):
     #smoothRes = np.load('../Data/ProcessedMouseKinematics/' + title+'smoothRes.npz')
     mouse_pos['smoothed_position_x'] = pd.Series(smoothRes['xnN'][0][0], index=mouse_pos.index)
     mouse_pos['smoothed_position_y'] = pd.Series(smoothRes['xnN'][3][0], index=mouse_pos.index)
+    '''
     mouse_pos['smoothed_velocity_x'] = pd.Series(smoothRes['xnN'][1][0], index=mouse_pos.index)
     mouse_pos['smoothed_velocity_y'] = pd.Series(smoothRes['xnN'][4][0], index=mouse_pos.index)
     mouse_pos['smoothed_acceleration_x'] = pd.Series(smoothRes['xnN'][2][0], index=mouse_pos.index)
@@ -286,14 +288,15 @@ def AddKinematics(smoothRes, mouse_pos):
     mouse_pos['smoothed_velocity_y_var'] = pd.Series(smoothRes['VnN'][4][4], index=mouse_pos.index)
     mouse_pos['smoothed_acceleration_x_var'] = pd.Series(smoothRes['VnN'][2][2], index=mouse_pos.index)
     mouse_pos['smoothed_acceleration_y_var'] = pd.Series(smoothRes['VnN'][5][5], index=mouse_pos.index)
+    '''
 
-    x_vel, y_vel = mouse_pos['smoothed_velocity_x'], mouse_pos['smoothed_velocity_y']
+    x_vel, y_vel = smoothRes['xnN'][1][0], smoothRes['xnN'][4][0]
     vel = np.sqrt(x_vel**2 + y_vel**2)
-    mouse_pos['smoothed_speed'] = pd.Series(vel)
+    mouse_pos['smoothed_speed'] = pd.Series(vel, index=mouse_pos.index)
         
-    x_acc, y_acc = mouse_pos['smoothed_acceleration_x'], mouse_pos['smoothed_acceleration_y']
+    x_acc, y_acc = smoothRes['xnN'][2][0], smoothRes['xnN'][5][0]
     acc = np.sqrt(x_acc**2 + y_acc**2)
-    mouse_pos['smoothed_acceleration'] = pd.Series(acc)
+    mouse_pos['smoothed_acceleration'] = pd.Series(acc, index=mouse_pos.index)
 
 def AddKinematics_filter(mouse_pos, filterRes):
     mouse_pos['filtered_position_x'] = pd.Series(filterRes['xnn'][0][0], index=mouse_pos.index)

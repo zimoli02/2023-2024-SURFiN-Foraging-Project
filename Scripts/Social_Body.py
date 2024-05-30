@@ -9,11 +9,6 @@ from pathlib import Path
 aeon_mecha_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(aeon_mecha_dir))
 
-import aeon
-import aeon.io.api as api
-from aeon.schema.dataset import exp02
-from aeon.analysis.utils import visits
-
 import Functions.kinematics as kinematics
 
 from sklearn.cluster import KMeans
@@ -96,12 +91,14 @@ def BodyAngle(type, mouse, data_x, data_y):
 
 
 def Sniffing(type, mouse, data_x, data_y):
-    dx = data_x['nose'] - data_x['head']
-    dy = data_y['nose'] - data_y['head']
+    mid_x = (data_x['right_ear'] + data_x['left_ear'])/2
+    mid_y = (data_y['right_ear'] + data_y['left_ear'])/2
+    dx = data_x['nose'] - mid_x
+    dy = data_y['nose'] - mid_y
     d = np.sqrt(dx**2 + dy**2)
 
     data = np.array(d.dropna()).reshape(-1, 1)
-    kmeans = KMeans(n_clusters=4, random_state=0)
+    kmeans = KMeans(n_clusters=3, random_state=0)
     kmeans.fit(data)
     
     center = np.sort(kmeans.cluster_centers_.T[0])
@@ -109,6 +106,7 @@ def Sniffing(type, mouse, data_x, data_y):
     axs = DrawPoses(center, d, data_x, data_y, axs)
     plt.savefig('../Images/Social_Nose/' + type + "_" + mouse + '.png')
     plt.show()
+
 
 
 def Get_Data(Type, Mouse):
@@ -146,8 +144,8 @@ def Process_Pose(get_body_length, get_body_angle, get_nose_head_distance):
 def main():
     
 
-    get_body_length = True
-    get_body_angle = True
+    get_body_length = False
+    get_body_angle = False
     get_nose_head_distance = True
 
     Process_Pose(get_body_length,

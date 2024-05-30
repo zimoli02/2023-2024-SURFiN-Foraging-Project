@@ -19,23 +19,42 @@ import Functions.patch as patch
 nodes_name = ['nose', 'head', 'right_ear', 'left_ear', 'spine1', 'spine2','spine3', 'spine4']
 
 INFO = pd.read_parquet('../SocialData/INFO3.parquet', engine='pyarrow')
-TYPE = ['Pre','Post']
-MOUSE = ['BAA-1104045', 'BAA-1104047']
+TYPE = ['Pre']
+MOUSE = ['BAA-1104045']
 LABELS = [
-    ['Pre','BAA-1104045'],
-    ['Pre','BAA-1104047'],
-    ['Post','BAA-1104045'],
-    ['Post','BAA-1104047']
+    ['Pre','BAA-1104045']
 ]
 
 color_names = ['black', "blue", "red", "tan", "green", "brown", "purple", "orange", 'turquoise', "black"]
 
-def FixNan(mouse_pos, column):
-    mouse_pos[column] = mouse_pos[column].interpolate()
-    mouse_pos[column] = mouse_pos[column].ffill()
-    mouse_pos[column] = mouse_pos[column].bfill()
+def FixNan(mouse_pos, dt, column):
+    df = mouse_pos.copy()
+    nan_blocks = df[column].isna()
+
+    for group, data in mouse_pos[nan_blocks].groupby((nan_blocks != nan_blocks.shift()).cumsum()):
+        latest_valid_index = mouse_pos.loc[:data.index[0]-(pd.Timedelta(dt)-pd.Timedelta('0.002S')), column].last_valid_index()
+        
+        
+        if latest_valid_index is None:
+            first_valid_index = df[column].first_valid_index()
+            first_valid_value = df.loc[first_valid_index, column]
+            df.loc[data.index, column] = first_valid_value
+        else:
+            latest_valid_value = mouse_pos.loc[latest_valid_index, column]
+        
+            if len(data) == 1:
+                df.loc[data.index, column] = latest_valid_value
+                
+            else:    
+                next_valid_index = mouse_pos.loc[data.index[-1]+(pd.Timedelta(dt)-pd.Timedelta('0.002S')):].first_valid_index()
+                next_valid_value = mouse_pos.loc[next_valid_index, column]
+                
+                duration = (data.index[-1] - latest_valid_index).total_seconds()
+                interpolated_times = (data.index - latest_valid_index).total_seconds() / duration        
+                total = next_valid_value - latest_valid_value    
+                df.loc[data.index, column] = latest_valid_value + interpolated_times * total
     
-    return mouse_pos
+    return df
 
 '''
 def Get_Latent_States(id, n, features):
@@ -43,12 +62,6 @@ def Get_Latent_States(id, n, features):
     mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
     obs = np.array(mouse_pos[features])
     hmm, states, transition_mat, lls = HMM.FitHMM(obs, num_states = n, n_iters = 50)
-    
-    state_mean_speed = hmm.observations.params[0].T[0]
-    index = np.argsort(state_mean_speed, -1)     
-    
-    HMM.PlotTransition(transition_mat[index].T[index].T, title = '../Images/Social_HMM/TransM.png')
-    np.save('../SocialData/HMMStates/TransM.npy', transition_mat[index].T[index].T)
     
     for label in LABELS:
         type, mouse = label[0], label[1]
@@ -104,35 +117,22 @@ def Display_Latent_States(N):
 '''        
 
 def Get_Latent_State_Number(features, N):
-    LogLikelihood = []
-    
-    for i in range(len(LABELS)):
-        type, mouse = LABELS[i][0], LABELS[i][1]
-        mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
-        
-        MOUSE_POS = []
-        for j in range(len(LABELS)):
-            if i == j: continue
-            else:
-                type_, mouse_ = LABELS[j][0], LABELS[j][1]
-                mouse_pos_ = pd.read_parquet('../SocialData/HMMData/' + type_ + "_" + mouse_ + '.parquet', engine='pyarrow')
-                MOUSE_POS.append(mouse_pos_)
-        MOUSE_POS = pd.concat(MOUSE_POS, ignore_index=False)
-        
-        obs = np.array(mouse_pos[features])
-        OBS = np.array(mouse_pos_[features])
+    type = 'Pre'
+    mouse = 'BAA-1104045'
 
-        loglikelihood = []
-        for n in N:
-            hmm, states, transition_mat, lls = HMM.FitHMM(obs, num_states = n, n_iters = 50)
-            ll = hmm.log_likelihood(OBS)
-            loglikelihood.append(ll/len(OBS[0]))
-        
-        LogLikelihood.append(loglikelihood)
-        np.save('../SocialData/HMMData/LogLikelihood.npy', LogLikelihood)
+    mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
+
+    obs = np.array(mouse_pos[features])
+
+    loglikelihood = []
+    for n in N:
+        hmm, states, transition_mat, lls = HMM.FitHMM(obs, num_states = n, n_iters = 50)
+        loglikelihood.append(lls)
+    
+    np.save('../SocialData/HMMData/LogLikelihood_single.npy', loglikelihood)
 
 def Display_Latent_State_Number(N):    
-    LogLikelihood = np.load('../SocialData/HMMData/LogLikelihood.npy', allow_pickle=True)
+    LogLikelihood = np.load('../SocialData/HMMData/LogLikelihood_single.npy', allow_pickle=True)
     fig, axs = plt.subplots(1,1,figsize = (10,7))
     for i in range(len(LogLikelihood)):
         loglikelihood = LogLikelihood[i]
@@ -140,10 +140,10 @@ def Display_Latent_State_Number(N):
         axs.plot(N, loglikelihood, color = 'black', label = i)
     axs.set_xticks(N)
     axs.legend()
-    plt.savefig('../Images/Social_HMM/StateNumber.png')
+    plt.savefig('../Images/Social_HMM/StateNumber_Single.png')
     plt.show()
 
-def Get_Observations(kinematics_Update, weight_Update, patch_Update, r_Update, bodylength_Update, bodyangle_Update, nose_Update):
+def Get_Observations(weight_Update, patch_Update, r_Update, bodylength_Update, bodyangle_Update, nose_Update):
     for type in TYPE:
         for mouse in MOUSE:
             try:
@@ -155,7 +155,7 @@ def Get_Observations(kinematics_Update, weight_Update, patch_Update, r_Update, b
             data_y = pd.read_parquet('../SocialData/BodyData/' + type + "_" + mouse + '_y.parquet', engine='pyarrow')
 
             if patch_Update:
-                mouse_pos = patch.InPatch(mouse_pos, r = 40, interval = 5, patch_loc = [[910.25, 544],[613.75, 724],[604.5, 375.75]])
+                mouse_pos = patch.InPatch(mouse_pos, r = 30, interval = 5, patch_loc = [])
             if r_Update:
                 mouse_pos = patch.Radius(mouse_pos, x_o = 709.4869937896729, y_o = 546.518087387085)
             if bodylength_Update:
@@ -163,7 +163,7 @@ def Get_Observations(kinematics_Update, weight_Update, patch_Update, r_Update, b
                 dy = data_y['spine4'] - data_y['head']
                 d = np.sqrt(dx**2 + dy**2)
                 mouse_pos['bodylength'] = pd.Series(d, index=mouse_pos.index)
-                mouse_pos = FixNan(mouse_pos,'bodylength')
+                mouse_pos = FixNan(mouse_pos,'0.1S', 'bodylength')
             if bodyangle_Update:
                 head = np.array([data_x['head'], data_y['head']]).T
                 spine2 = np.array([data_x['spine2'], data_y['spine2']]).T
@@ -178,15 +178,13 @@ def Get_Observations(kinematics_Update, weight_Update, patch_Update, r_Update, b
                 radians_theta = np.arccos(cos_theta)
                 degree_theta = np.degrees(radians_theta)
                 mouse_pos['bodyangle'] = pd.Series(degree_theta, index=mouse_pos.index)
-                mouse_pos = FixNan(mouse_pos,'bodyangle')
+                mouse_pos = FixNan(mouse_pos,'0.1S', 'bodyangle')
             if nose_Update:
-                mid_x = (data_x['right_ear'] + data_x['left_ear'])/2
-                mid_y = (data_y['right_ear'] + data_y['left_ear'])/2
-                dx = data_x['nose'] - mid_x
-                dy = data_y['nose'] - mid_y
+                dx = data_x['nose'] - data_x['head']
+                dy = data_y['nose'] - data_y['head']
                 d = np.sqrt(dx**2 + dy**2)
                 mouse_pos['nose'] = pd.Series(d, index=mouse_pos.index)
-                mouse_pos = FixNan(mouse_pos,'nose')
+                mouse_pos = FixNan(mouse_pos,'0.1S', 'nose')
                 
             mouse_pos.to_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
 
@@ -209,17 +207,16 @@ def main():
     
     features = ['smoothed_speed', 'smoothed_acceleration', 'r','bodylength', 'bodyangle', 'nose']
     
-    '''Get_Observations(kinematics_Update = False,   
-                        weight_Update = False,
+    '''
+    Get_Observations(weight_Update = False,
                         patch_Update = False,
-                        r_Update = True,
+                        r_Update = False,
                         bodylength_Update = True,
                         bodyangle_Update = True,
                         nose_Update = True)
-    '''    
-    
+    '''
+        
     Get_Latent_State_Number(features, N = np.arange(3,20))
-    
     Display_Latent_State_Number(N = np.arange(3,20))
     
     """

@@ -9,13 +9,17 @@ from pathlib import Path
 import sys
 from pathlib import Path
 
-aeon_mecha_dir = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(aeon_mecha_dir))
+current_script_path = Path(__file__).resolve()
+parent_dir = current_script_path.parents[2] / 'aeon_mecha' 
+sys.path.insert(0, str(parent_dir))
 
 import aeon
 import aeon.io.api as api
 from aeon.schema.dataset import exp02
 from aeon.analysis.utils import visits
+
+function_dir = current_script_path.parent.parent
+sys.path.insert(0, str(function_dir))
 
 import Functions.patch as patch
 
@@ -30,12 +34,14 @@ def ConcatenateSessions():
     dfs = []
     for i in range(len(short_sessions)):
         title = 'ShortSession'+str(i)
-        Visits_Patch1 = pd.read_parquet('../Data/RegressionPatchVisits/' + title + 'Visit1.parquet', engine='pyarrow')
+        '''Visits_Patch1 = pd.read_parquet('../Data/RegressionPatchVisits/' + title + 'Visit1.parquet', engine='pyarrow')
         Visits_Patch2 = pd.read_parquet('../Data/RegressionPatchVisits/' + title + 'Visit2.parquet', engine='pyarrow')
         dfs.append(Visits_Patch1)
-        dfs.append(Visits_Patch2)
+        dfs.append(Visits_Patch2)'''
+        Visits = pd.read_parquet('../Data/RegressionPatchVisits/' + title + 'Visit.parquet', engine='pyarrow')
+        dfs.append(Visits)
         
-    VISIT = pd.concat(dfs, ignore_index=False)
+    VISIT = pd.concat(dfs, ignore_index=True)
     VISIT = VISIT[VISIT['distance'] >= 0.1]
     VISIT['interc'] = 1
     
@@ -46,15 +52,16 @@ def main():
         title = 'ShortSession'+str(i)
 
         mouse_pos = pd.read_parquet('../Data/MousePos/' + title + 'mousepos.parquet', engine='pyarrow')
-        states = np.load('../Data/HMMStates/' + title+'States_Unit.npy', allow_pickle=True)
-        mouse_pos['states'] = pd.Series(states, index=mouse_pos.index)
         
         Visits_Patch1 = patch.Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 30)
         Visits_Patch2 = patch.Visits(mouse_pos, patch = 'Patch2', pre_period_seconds = 30)
-        Visits_Patch1, Visits_Patch2 = patch.VisitIntervals(Visits_Patch1, Visits_Patch2) 
-
+        
+        '''Visits_Patch1, Visits_Patch2 = patch.VisitIntervals(Visits_Patch1, Visits_Patch2) 
         Visits_Patch1.to_parquet('../Data/RegressionPatchVisits/' + title+'Visit1.parquet', engine='pyarrow')
-        Visits_Patch2.to_parquet('../Data/RegressionPatchVisits/' + title+'Visit2.parquet', engine='pyarrow')
+        Visits_Patch2.to_parquet('../Data/RegressionPatchVisits/' + title+'Visit2.parquet', engine='pyarrow')'''
+        
+        Visits = patch.VisitIntervals([Visits_Patch1, Visits_Patch2])
+        Visits.to_parquet('../Data/RegressionPatchVisits/' + title+'Visit.parquet', engine='pyarrow')
         
         print(title)
 
