@@ -3,18 +3,30 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 import pandas as pd
+import seaborn as sns
+from collections import Counter
 from pathlib import Path
 
 import sys
 from pathlib import Path
 
-aeon_mecha_dir = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(aeon_mecha_dir))
-
+current_script_path = Path(__file__).resolve()
+function_dir = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(function_dir))
 import Functions.HMM as HMM
 import Functions.kinematics as kinematics
 import Functions.patch as patch
+from SSM.ssm.plots import gradient_cmap
 
+parent_dir = current_script_path.parents[2] / 'aeon_mecha' 
+sys.path.insert(0, str(parent_dir))
+import aeon
+import aeon.io.api as api
+from aeon.schema.dataset import exp02
+from aeon.analysis.utils import visits
+from aeon.schema.schemas import social02
+
+root = '/ceph/aeon/aeon/data/raw/AEON3/social0.2/'
 
 nodes_name = ['nose', 'head', 'right_ear', 'left_ear', 'spine1', 'spine2','spine3', 'spine4']
 
@@ -28,7 +40,7 @@ LABELS = [
     ['Post','BAA-1104047']
 ]
 
-color_names = ['black', "blue", "red", "tan", "green", "brown", "purple", "orange", 'turquoise', "black"]
+color_names = ['black', "blue", "red", "tan", "green", "brown", "purple", "orange", 'turquoise', "yellow", 'pink', 'darkblue']
 
 def FixNan(mouse_pos, column):
     mouse_pos[column] = mouse_pos[column].interpolate()
@@ -37,7 +49,26 @@ def FixNan(mouse_pos, column):
     
     return mouse_pos
 
-'''
+def Calculate_TransM_From_States(N):
+    for label in LABELS:
+        type, mouse = label[0], label[1]
+        mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
+        states = np.load('../SocialData/HMMStates/' + type + "_" + mouse + "_States.npy", allow_pickle = True)
+        mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
+        
+        grouped = mouse_pos.groupby([pd.Grouper(freq='10S'), 'state']).size()
+        prob = grouped.groupby(level=0).apply(lambda g: g / g.sum())
+        states_prob = prob.unstack(level=-1).fillna(0)
+        states_prob.index = states_prob.index.get_level_values(0)
+        
+        manual_trans_mat = np.zeros((N,N))
+        for k in range(1,len(states)): manual_trans_mat[states[k-1]][states[k]] += 1
+        for k in range(N): 
+            if np.sum(manual_trans_mat[k]) != 0: manual_trans_mat[k] = manual_trans_mat[k]/np.sum(manual_trans_mat[k])
+
+        HMM.PlotTransition(manual_trans_mat, title = '../Images/Social_HMM/'+ type + "_" + mouse +'TransM.png')
+        
+
 def Get_Latent_States(id, n, features):
     type, mouse = LABELS[id][0], LABELS[id][1]
     mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
@@ -62,6 +93,51 @@ def Get_Latent_States(id, n, features):
         states = new_values
         np.save('../SocialData/HMMStates/' + type + "_" + mouse + "_States.npy", states)
 
+def PlotStatesWithTime(states, mouse_pos, type, N, axs):
+    colors = sns.xkcd_palette(color_names[0:N])
+    cmap = gradient_cmap(colors)
+
+    times = pd.to_datetime(mouse_pos.index)
+    numerical_times = (times - times[0]).total_seconds().values
+    states_array = states.reshape(1, -1)
+    
+    
+    extent = [numerical_times[0], numerical_times[-1], 0, 1]
+    cax = axs.imshow(states_array, aspect="auto", cmap=cmap, vmin=0, vmax=N-1, extent=extent)
+    
+    axs.set_xlabel('Time')
+    axs.set_xticks(numerical_times[::len(numerical_times)//10])
+    axs.set_xticklabels([time.strftime('%H:%M:%S') for time in times[::len(times)//10]], rotation=45, ha='right')
+    
+    axs.set_ylabel(type)
+    axs.set_yticks([])
+
+    return cax, axs
+
+def PlotStates(mouse_pos, N, type, mouse):
+    grouped = mouse_pos.groupby([pd.Grouper(freq='10S'), 'state']).size()
+    prob = grouped.groupby(level=0).apply(lambda g: g / g.sum())
+    states_prob = prob.unstack(level=-1).fillna(0)
+    states_prob.index = states_prob.index.get_level_values(0)
+        
+    for i in range(N):
+        if i not in states_prob.columns: states_prob[i] = 0
+        
+    x = np.array([np.array(states_prob[i].to_list()) for i in range(N)])
+
+    states_ = []
+    for i in range(len(x[0])):
+        current_state = x.T[i]
+        states_.append(np.argmax(current_state))
+        
+    fig, axs = plt.subplots(1, 1, figsize=(35, 4))
+    cax, axs = PlotStatesWithTime(np.array(states_), states_prob, type = 'States Prob.', N = N, axs = axs)
+    cbar = fig.colorbar(cax, ax=axs, orientation='vertical')
+    cbar.set_ticks(np.arange(0, N))
+    cbar.set_ticklabels([f'State {val}' for val in np.arange(0, N)])
+    plt.savefig('../Images/Social_HMM/' + type + "_" +mouse+'.png')
+    plt.show()
+
 
 def Display_Latent_States(N):
     X, Y, SPEED, ACCE, LENGTH, ANGLE = [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)]
@@ -70,6 +146,8 @@ def Display_Latent_States(N):
         mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
         states = np.load('../SocialData/HMMStates/' + type + "_" + mouse + "_States.npy", allow_pickle = True)
         mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
+        
+        PlotStates(mouse_pos, N, type, mouse)
 
         for i in range(N):
             X[i] = np.concatenate([X[i], mouse_pos['smoothed_position_x'][states==i]])
@@ -82,8 +160,8 @@ def Display_Latent_States(N):
     fig, axs = plt.subplots(1, N, figsize = (N*8-2,6))
     for i in range(N):
         axs[i].scatter(X[i], Y[i], color = color_names[i], s = 2, alpha = 0.2)
-        axs[i].set_xlim(145, 1250)
-        axs[i].set_ylim(50, 1080)
+        axs[i].set_xlim((100,1400))
+        axs[i].set_ylim((-20,1100))
         axs[i].set_title('State' + str(i))
         axs[i].set_xlabel('X')
         axs[i].set_ylabel('Y')
@@ -91,7 +169,7 @@ def Display_Latent_States(N):
     plt.show()
     
     DATA = [SPEED, ACCE, LENGTH, ANGLE]
-    FEATURE = [SPEED, ACCE, LENGTH, ANGLE]
+    FEATURE = ['SPEED', 'ACCE', 'LENGTH', 'ANGLE']
     fig, axs = plt.subplots(len(FEATURE), 1, figsize = (10, len(FEATURE)*7-1))
     for data, i in zip(DATA, range(len(DATA))):
         means = [np.mean(arr) for arr in data]
@@ -101,7 +179,7 @@ def Display_Latent_States(N):
         axs[i].set_ylabel(FEATURE[i])
     plt.savefig('../Images/Social_HMM/Data.png')
     plt.show()
-'''        
+
 
 def Get_Latent_State_Number(features, N):
     LogLikelihood = []
@@ -205,6 +283,240 @@ def Get_Data(Type, Mouse):
 
     return Mouse_pos
 
+
+def PelletDeliveries(t = 6, n=9):
+    
+    Pellets_State = []
+    
+    for label in LABELS:
+        type, mouse = label[0], label[1]
+        mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
+        states = np.load('../SocialData/HMMStates/' + type + "_" + mouse + "_States.npy", allow_pickle = True)
+        mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
+        
+        try:
+            PELLET = pd.read_parquet('../SocialData/Pellets/'+ type + "_" + mouse +'_PELLET.parquet', engine='pyarrow')
+        except FileNotFoundError:
+            start, end = mouse_pos.index[0], mouse_pos.index[-1]
+            
+            social02.Patch1.DeliverPellet.value = 1
+            social02.Patch2.DeliverPellet.value = 1
+            social02.Patch3.DeliverPellet.value = 1
+            pellets_patch1 = api.load(root, social02.Patch1.DeliverPellet, start=start, end=end)
+            pellets_patch2 = api.load(root, social02.Patch2.DeliverPellet, start=start, end=end)
+            pellets_patch3 = api.load(root, social02.Patch3.DeliverPellet, start=start, end=end)
+            
+            PELLET = pd.concat([pellets_patch1,pellets_patch2, pellets_patch3], ignore_index=False)
+            PELLET = PELLET.sort_index()
+            PELLET.to_parquet('../SocialData/Pellets/'+ type + "_" + mouse +'_PELLET.parquet', engine='pyarrow')
+
+
+        for i in range(len(PELLET)):
+            trigger = PELLET.index[i]
+            
+            latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('6S'):trigger, 'state'].index
+            latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
+            if len(latest_valid_state) >= 50: latest_valid_state  = latest_valid_state[-50:]
+            
+            next_valid_index = mouse_pos.loc[trigger:trigger + pd.Timedelta('6S'), 'state'].index
+            next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
+            if len(next_valid_state) >= 50: next_valid_state  = next_valid_state[:50]
+            
+            state = np.concatenate((latest_valid_state, next_valid_state))
+            
+            if len(state) == 100: Pellets_State.append(state)
+
+
+    N = n
+    colors = sns.xkcd_palette(color_names[0:N])
+    cmap = gradient_cmap(colors)
+
+    fig, axs = plt.subplots(1, 1, figsize=(6, 16))
+    sns.heatmap(Pellets_State,cmap=cmap, ax=axs, vmin=0, vmax = N-1, cbar = True)
+    axs.set_aspect('auto')
+
+    axs.set_xticks([50])
+    axs.set_xticklabels(['Pellet'], rotation = 0)
+
+    axs.set_ylabel("Pellet Deliveries")
+    axs.set_yticks([])
+
+    plt.savefig('../Images/Social_HMM/PelletDelivery.png')
+    plt.show()
+    
+def StateBeforeVisit(n=9):
+    STATE, DURATION = [],[]
+    for label in LABELS:
+        type, mouse = label[0], label[1]
+        mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
+        states = np.load('../SocialData/HMMStates/' + type + "_" + mouse + "_States.npy", allow_pickle = True)
+        mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
+        
+        Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
+        Visits = Visits.dropna(subset=['speed'])
+        Visits['distance'] = abs(Visits['distance'])
+        Visits = Visits[Visits['distance'] >= 0.1]
+        
+        for i in range(len(Visits)):
+            trigger = Visits.iloc[i]['start']
+            
+            latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('11S'):trigger, 'state'].index
+            latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
+            if len(latest_valid_state) >= 100: latest_valid_state  = latest_valid_state[-100:]
+            
+            count = Counter(latest_valid_state)
+            states_before_forage, frequency = count.most_common(1)[0]
+            
+            #if len(states_before_forage) == 0: continue
+            STATE.append(states_before_forage)
+            DURATION.append(Visits.iloc[i]['duration'])
+        
+    fig, axs = plt.subplots(1, 1, figsize=(10,6))
+    axs.scatter(STATE,DURATION)
+    axs.set_xlabel('State')
+    axs.set_ylabel("Visit Duration")
+    axs.set_yticks([])
+    plt.savefig('../Images/Social_HMM/StateBeforeVisit.png')
+    plt.show()
+
+
+def StartVisit(n=9):    
+    STATE, DURATION = [],[]
+    for label in LABELS:
+        type, mouse = label[0], label[1]
+        mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
+        states = np.load('../SocialData/HMMStates/' + type + "_" + mouse + "_States.npy", allow_pickle = True)
+        mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
+        
+        Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
+        Visits = Visits.dropna(subset=['speed'])
+        Visits['distance'] = abs(Visits['distance'])
+        Visits = Visits[Visits['distance'] >= 0.1]
+        
+        for i in range(len(Visits)):
+            trigger = Visits.iloc[i]['start']
+            
+            latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('21S'):trigger, 'state'].index
+            latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
+            if len(latest_valid_state) >= 200: latest_valid_state  = latest_valid_state[-200:]
+            
+            next_valid_index = mouse_pos.loc[trigger:trigger + pd.Timedelta('6S'), 'state'].index
+            next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
+            if len(next_valid_state) >= 50: next_valid_state  = next_valid_state[:50]
+            state = np.concatenate((latest_valid_state, next_valid_state))
+            if len(state) == 0: continue
+            
+            STATE.append(state)
+            DURATION.append(Visits.iloc[i]['duration'])
+
+    index = np.argsort(DURATION)
+    STATES = np.array(STATES)[index]
+    
+    N = n
+    colors = sns.xkcd_palette(color_names[0:N])
+    cmap = gradient_cmap(colors)
+
+    fig, axs = plt.subplots(1, 1, figsize=(10, 16))
+    sns.heatmap(STATES,cmap=cmap, ax=axs, vmin=0, vmax = N-1, cbar = True)
+    axs.set_aspect('auto')
+    
+    axs.set_xticks([200])
+    axs.set_xticklabels(['Enter'], rotation = 0)
+
+    axs.set_ylabel("Visits")
+    axs.set_yticks([])
+
+    plt.savefig('../Images/Social_HMM/EnterVisit.png')
+    plt.show()
+    
+    
+    AVE_STATES = []
+    AVE_STATES_D = []
+    for k in np.arange(n):
+        index = STATES == k
+        states = index*1
+        AVE_STATES.append(np.mean(states, axis = 0))
+        AVE_STATES_D.append(np.mean(states, axis = 1))
+    
+    fig, axs = plt.subplots(1, 1, figsize=(20, 4))
+    sns.heatmap(AVE_STATES,ax=axs)
+    axs.set_aspect('auto')
+    
+    axs.set_xticks([200])
+    axs.set_xticklabels(['Enter'], rotation = 0)
+
+    axs.set_ylabel("Visits")
+    axs.set_yticks([])
+
+    plt.savefig('../Images/Social_HMM/EnterVisit_' + 'EachState' + '.png')
+    plt.show()
+    
+    
+    fig, axs = plt.subplots(1, 1, figsize=(4, 16))
+    sns.heatmap(np.array(AVE_STATES_D).T,ax=axs)
+    axs.set_aspect('auto')
+
+    axs.set_ylabel("Visits")
+    axs.set_yticks([])
+
+    plt.savefig('../Images/Social_HMM/EnterVisit_' + 'EachState_D' + '.png')
+    plt.show()
+    
+def EndVisit(n=9):    
+    STATES, DURATION = [],[]
+    for label in LABELS:
+        type, mouse = label[0], label[1]
+        mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
+        states = np.load('../SocialData/HMMStates/' + type + "_" + mouse + "_States.npy", allow_pickle = True)
+        mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
+        
+        Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
+        Visits = Visits.dropna(subset=['speed'])
+        Visits['distance'] = abs(Visits['distance'])
+        Visits = Visits[Visits['distance'] >= 0.1]
+        
+        for i in range(len(Visits)):
+            trigger = Visits.iloc[i]['end']
+            
+            latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('6S'):trigger, 'state'].index
+            latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
+            if len(latest_valid_state) >= 50: latest_valid_state  = latest_valid_state[-50:]
+            
+            next_valid_index = mouse_pos.loc[trigger:trigger + pd.Timedelta('21S'), 'state'].index
+            next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
+            if len(next_valid_state) >= 200: next_valid_state  = next_valid_state[:200]
+            state = np.concatenate((latest_valid_state, next_valid_state))
+            if len(state) == 0: continue
+            STATES.append(state)
+            DURATION.append(Visits.iloc[i]['duration'])
+
+    index = np.argsort(DURATION)
+    STATES = np.array(STATES)[index]
+    N = n
+    colors = sns.xkcd_palette(color_names[0:N])
+    cmap = gradient_cmap(colors)
+    
+    fig, axs = plt.subplots(1, 1, figsize=(10, 16))
+    sns.heatmap(STATES,cmap=cmap, ax=axs, vmin=0, vmax = N-1, cbar = True)
+    axs.set_aspect('auto')
+    
+    axs.set_xticks([50])
+    axs.set_xticklabels(['Leave'], rotation = 0)
+
+    axs.set_ylabel("Visits")
+    axs.set_yticks([])
+
+    plt.savefig('../Images/Social_HMM/EndVisit.png')
+    plt.show()
+
+
+def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,start_visit = True,end_visit = True,N=9):
+    if pellet_delivery: PelletDeliveries(n=N)
+    if state_before_visit: StateBeforeVisit(n=N)
+    if start_visit: StartVisit(n=N)
+    if end_visit: EndVisit(n=N)
+    
+
 def main():
     
     features = ['smoothed_speed', 'smoothed_acceleration', 'r','bodylength', 'bodyangle', 'nose']
@@ -216,17 +528,23 @@ def main():
                         bodylength_Update = True,
                         bodyangle_Update = True,
                         nose_Update = True)
-    '''    
+        
     
     Get_Latent_State_Number(features, N = np.arange(3,20))
     
     Display_Latent_State_Number(N = np.arange(3,20))
+    '''
     
-    """
-    Get_Latent_States(id, n, features)
-    Display_Latent_States()
-    """
     
+    #Get_Latent_States(id=1, n=9, features = features)
+    #Display_Latent_States(N = 9)
+    #Calculate_TransM_From_States(N=9)
+    
+    Get_States_Characterized(pellet_delivery = False,
+                                state_before_visit = False,
+                                start_visit = True,
+                                end_visit = False,
+                                N=9)
 
 
 if __name__ == "__main__":

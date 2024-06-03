@@ -6,18 +6,29 @@ from pathlib import Path
 import sys
 from pathlib import Path
 
-aeon_mecha_dir = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(aeon_mecha_dir))
+current_script_path = Path(__file__).resolve()
+function_dir = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(function_dir))
+import Functions.kinematics as kinematics
+import Functions.inference as inference
 
+parent_dir = current_script_path.parents[2] / 'aeon_mecha' 
+sys.path.insert(0, str(parent_dir))
 import aeon
 import aeon.io.api as api
 from aeon.schema.dataset import exp02
 from aeon.analysis.utils import visits
-
-import Functions.kinematics as kinematics
-import Functions.inference as inference
+from aeon.schema.schemas import social02
 
 INFO = pd.read_parquet('../SocialData/INFO3.parquet', engine='pyarrow')
+TYPE = ['Pre','Post']
+MOUSE = ['BAA-1104045', 'BAA-1104047']
+LABELS = [
+    ['Pre','BAA-1104045'],
+    ['Pre','BAA-1104047'],
+    ['Post','BAA-1104045'],
+    ['Post','BAA-1104047']
+]
 
 def CenterOfMass(data_x, data_y):
     x = data_x['spine2']
@@ -132,7 +143,42 @@ def Display():
         plt.show()'''
             
 
-wo
+def Display_Along_Time():
+    for label in LABELS:
+        type, mouse = label[0], label[1]
+        mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
+
+        start = mouse_pos.index[0]
+        end = mouse_pos.index[-1]
+        starts, ends = [],[]
+        while start < end:
+            end_ = start + pd.Timedelta('4H')
+
+            starts.append(start)
+            ends.append(end_)
+            start = end_ + pd.Timedelta('1S')
+
+        n = len(starts)
+        fis, axs = plt.subplots(n, 4, figsize = (30, 4*n))
+        for i in range(n):
+            df = mouse_pos[starts[i]:ends[i]]
+            speed = df.smoothed_speed
+            axs[i,0].hist(speed[speed<10],bins = 100)
+            axs[i,0].set_xlim((0,10))
+            axs[i,1].hist(speed[speed>10],bins = 100)
+            axs[i,1].set_xlim((10,1000))
+            
+            acce = df.smoothed_acceleration
+            axs[i,2].hist(acce[acce<5],bins = 100)
+            axs[i,2].set_xlim((0,5))
+            axs[i,3].hist(acce[acce>5],bins = 100)
+            axs[i,3].set_xlim((5,2000))
+            
+            axs[i,0].set_ylabel(starts[i].hour)
+        
+        plt.savefig('../Images/Social_LDS/' + type + '_' + mouse +'_Kinematics_with_Time.png')
+        plt.show()
+
 def main():
     
     
@@ -142,9 +188,11 @@ def main():
 
         
     #ProcessLDSData()
-    Get_Parameters()
-    Get_Inference()
-    Display()
+    #Get_Parameters()
+    #Get_Inference()
+    #Display()
+    
+    Display_Along_Time()
         
 
 if __name__ == "__main__":

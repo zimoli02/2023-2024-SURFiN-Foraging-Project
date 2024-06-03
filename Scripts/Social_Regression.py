@@ -4,7 +4,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from pathlib import Path
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.preprocessing import StandardScaler
+import statsmodels.api as sm
+from collections import Counter
 
 import sys
 from pathlib import Path
@@ -37,25 +43,46 @@ LABELS = [
 
 def ConcatenateSessions():
     dfs = []
-    for i in range(len(LABEL)):
-        type, mouse = LABEL[i][0], LABEL[i][1]
+    for i in range(len(LABELS)):
+        type, mouse = LABELS[i][0], LABELS[i][1]
         Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
+        
+        Visits = Visits.dropna(subset=['speed'])
+        Visits['distance'] = abs(Visits['distance'])
+        Visits = Visits[Visits['distance'] >= 0.1]
+        
         dfs.append(Visits)
-    VISIT = pd.concat(dfs, ignore_index=False)
-    VISIT = VISIT[VISIT['distance'] >= 0.1]
+        
+    VISIT = pd.concat(dfs, ignore_index=True)
     
     return VISIT
 
-def Procress_Visits():
-    for i in range(len(LABEL)):
-        type, mouse = LABEL[i][0], LABEL[i][1]
+def Process_Visits():
+    for i in range(len(LABELS)):
+        print(i)
+        type, mouse = LABELS[i][0], LABELS[i][1]
         mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
-        Visits_Patch1 = patch.Social_Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 30, arena_r = 511)
-        Visits_Patch2 = patch.Social_Visits(mouse_pos, patch = 'Patch2', pre_period_seconds = 30, arena_r = 511)
-        Visits_Patch3 = patch.Social_Visits(mouse_pos, patch = 'Patch3', pre_period_seconds = 30, arena_r = 511)
+        
+        try:
+            Visits_Patch1 = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit1.parquet', engine='pyarrow')
+        except FileNotFoundError:
+            Visits_Patch1 = patch.Social_Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 30, arena_r = 511)
+            Visits_Patch1.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit1.parquet', engine='pyarrow')
+        
+        try:
+            Visits_Patch2 = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit2.parquet', engine='pyarrow')
+        except FileNotFoundError:
+            Visits_Patch2 = patch.Social_Visits(mouse_pos, patch = 'Patch2', pre_period_seconds = 30, arena_r = 511)
+            Visits_Patch2.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit2.parquet', engine='pyarrow')
+        
+        try:
+            Visits_Patch3 = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit3.parquet', engine='pyarrow')
+        except FileNotFoundError:
+            Visits_Patch3 = patch.Social_Visits(mouse_pos, patch = 'Patch3', pre_period_seconds = 30, arena_r = 511)
+            Visits_Patch3.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit3.parquet', engine='pyarrow')
         
         Visits = patch.VisitIntervals([Visits_Patch1, Visits_Patch2, Visits_Patch3]) 
-        Visits_Patch1.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
+        Visits.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
 
 
 def Variables(VISIT, feature, predictor = 'distance'):
@@ -167,15 +194,15 @@ def Fit_Models(Visits, FEATURES, MODELS, PREDICTOR):
     X, Y = Variables(Visits, feature = FEATURES, predictor=PREDICTOR)
     
     for MODEL in MODELS:
-        result, y_pred, average_mse = Model(X, Y, model = MODEL)
-        print("Average MSE per Prediction for " + TYPE + " Model Fitted: ", average_mse)
+        result, y_pred, average_mse = Model(X, Y, type = MODEL)
+        print("Average MSE per Prediction for " + MODEL + " Model Fitted: ", average_mse)
         
-        PlotModelPrediction(Y, y_pred, predictor=PREDICTOR, model = MODEL)
-        PlotModelPrediction_Scatter(Y, y_pred, predictor=PREDICTOR, model = MODEL)
+        PlotModelPrediction(Y, y_pred, predictor=PREDICTOR, TYPE = MODEL)
+        PlotModelPrediction_Scatter(Y, y_pred, predictor=PREDICTOR, TYPE = MODEL)
         PrintModelSummary(result, MODEL)
 
 def main():
-    Process_Visits()
+    #Process_Visits()
     Visits = ConcatenateSessions()
     Fit_Models(Visits, FEATURES = ['speed','acceleration', 'last_pellets_self', 'last_pellets_other', 'interval' ,'entry'], MODELS = ['Poisson', 'Gaussian', 'Gamma'], PREDICTOR = 'distance')
 

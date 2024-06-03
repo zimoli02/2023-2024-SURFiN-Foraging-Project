@@ -14,9 +14,9 @@ import sys
 from pathlib import Path
 
 current_script_path = Path(__file__).resolve()
-parent_dir = current_script_path.parent.parent
-sys.path.insert(0, str(parent_dir))
 
+parent_dir = current_script_path.parents[2] / 'aeon_mecha' 
+sys.path.insert(0, str(parent_dir))
 import aeon
 import aeon.io.api as api
 from aeon.io import reader, video
@@ -135,23 +135,59 @@ def MoveWheel(start, end, patch = 'Patch1', interval_seconds = 10):
 
 
 def Social_MoveWheel(start, end, patch = 'Patch1', interval_seconds = 10):
-    if patch == 'Patch1': encoder = api.load(root, social02.Patch1.Encoder, start=start, end=end)
-    elif patch == 'Patch2': encoder = api.load(root, social02.Patch2.Encoder, start=start, end=end)
-    else: encoder = api.load(root, social02.Patch3.Encoder, start=start, end=end)
+    root = '/ceph/aeon/aeon/data/raw/AEON3/social0.2'
+    
+    starts, ends = [],[]
+    while start < end:
+        if start.minute != 0:
+            end_ = pd.Timestamp(year = start.year, month = start.month, day = start.day, hour = start.hour+1, minute=0, second=0) - pd.Timedelta('2S')
+        else:
+            end_ = start + pd.Timedelta('1H') - pd.Timedelta('2S')
+        starts.append(start+ pd.Timedelta('1S'))
+        ends.append(end_)
+        start = end_ + pd.Timedelta('2S')
+    
+    encoders = []
+    if patch == 'Patch1': 
+        for i in range(len(starts)):
+            start, end = starts[i], ends[i]
+            encoder = aeon.load(root, social02.Patch1.Encoder, start=start, end=end)
+            encoders.append(encoder)
+    elif patch == 'Patch2': 
+        for i in range(len(starts)):
+            start, end = starts[i], ends[i]
+            encoder = aeon.load(root, social02.Patch2.Encoder, start=start, end=end)
+            encoders.append(encoder)
+    else: 
+        for i in range(len(starts)):
+            start, end = starts[i], ends[i]
+            encoder = aeon.load(root, social02.Patch3.Encoder, start=start, end=end)
+            encoders.append(encoder)
+    encoder = pd.concat(encoders, ignore_index=False)
+    encoder = encoder[::5]
+    
+    encoder = encoder.sort_index()
+    encoder = encoder[~encoder.index.duplicated(keep='first')]
     
     w = -distancetravelled(encoder.angle).to_numpy()
     dw = np.concatenate((np.array([0]), w[:-1]- w[1:]))
     encoder['Distance'] = pd.Series(w, index=encoder.index)
     encoder['DistanceChange'] = pd.Series(dw, index=encoder.index)
     encoder['DistanceChange'] = encoder['DistanceChange'].rolling('10S').mean()
-    encoder['Move'] = np.where(encoder.DistanceChange > 0.001, 1, 0)
+    encoder['Move'] = np.where(abs(encoder.DistanceChange) > 0.001, 1, 0)
     
     if interval_seconds < 0.01: return encoder
     groups = encoder['Move'].ne(encoder['Move'].shift()).cumsum()
-    zeros_groups = encoder[encoder['Move'] == 0].groupby(groups)['Move']
-    for name, group in zeros_groups:
-        duration = group.index[-1] - group.index[0]
-        if duration < pd.Timedelta(seconds=interval_seconds): encoder.loc[group.index, 'Move'] = 1
+    one_groups = encoder[encoder['Move'] == 1].groupby(groups).groups
+    one_groups = list(one_groups.values())
+
+    for i in range(len(one_groups) - 1):
+        end_current_group = one_groups[i][-1]
+        start_next_group = one_groups[i + 1][0]
+        duration = start_next_group - end_current_group
+
+        if duration < pd.Timedelta(seconds=interval_seconds):
+            encoder.loc[end_current_group:start_next_group, 'Move'] = 1
     return encoder
 
 
@@ -206,11 +242,12 @@ def Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10, arena_r = 468.9
     return pd.DataFrame(Visits)
 
 def Social_Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10, arena_r = 468.9626404164694):
-    encoder = Social_MoveWheel(mouse_pos.index[0], mouse_pos.index[-1], patch = patch)
+    root = '/ceph/aeon/aeon/data/raw/AEON3/social0.2'
+    encoder = Social_MoveWheel(mouse_pos.index[0], mouse_pos.index[-1], patch = patch, interval_seconds = 10)
         
     entry = EnterArena(mouse_pos, arena_r)
         
-    Visits = {'start':[],'end':[], 'distance':[], 'duration':[], 'speed':[], 'acceleration':[], 'weight':[],'entry':[], 'patch':[], 'pellet':[]}
+    Visits = {'start':[],'end':[], 'distance':[], 'duration':[], 'speed':[], 'acceleration':[], 'entry':[], 'patch':[], 'pellet':[]}
     
     groups = encoder['Move'].ne(encoder['Move'].shift()).cumsum()
     visits = encoder[encoder['Move'] == 1].groupby(groups)['Move']
@@ -240,12 +277,15 @@ def Social_Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10, arena_r 
         Visits['patch'].append(patch)
         
         if patch == 'Patch1':
-            pellets = api.load(root, social02.Patch1.DeliverPellet, start=start, end=end)
+            social02.Patch1.DeliverPellet.value = 1
+            pellets = aeon.load(root, social02.Patch1.DeliverPellet, start=start, end=end)
         elif patch == 'Patch2':
-            pellets = pellets = api.load(root, social02.Patch1.DeliverPellet, start=start, end=end)
+            social02.Patch2.DeliverPellet.value = 1
+            pellets = aeon.load(root, social02.Patch2.DeliverPellet, start=start, end=end)
         else: 
-            pellets = pellets = api.load(root, social02.Patch1.DeliverPellet, start=start, end=end)
-        Visits['pellet'].append(pellets)
+            social02.Patch3.DeliverPellet.value = 1
+            pellets = aeon.load(root, social02.Patch3.DeliverPellet, start=start, end=end)
+        Visits['pellet'].append(len(pellets))
     
     return pd.DataFrame(Visits)
 
@@ -253,6 +293,7 @@ def Social_Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10, arena_r 
 
 def VisitIntervals(Patches = []):
     Visits = pd.concat(Patches, ignore_index=True)
+    Visits = Visits[abs(Visits['distance']) >= 0.1]
     Visits = Visits.sort_values(by='start',ignore_index=True)  
     
     Visits['last_pellets_self'] = 0
