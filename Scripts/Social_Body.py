@@ -19,7 +19,12 @@ nodes_name = ['nose', 'head', 'right_ear', 'left_ear', 'spine1', 'spine2','spine
 INFO = pd.read_parquet('../SocialData/INFO3.parquet', engine='pyarrow')
 TYPE = ['Pre','Post']
 MOUSE = ['BAA-1104045', 'BAA-1104047']
-
+LABELS = [
+    ['Pre','BAA-1104045'],
+    ['Pre','BAA-1104047'],
+    ['Post','BAA-1104045'],
+    ['Post','BAA-1104047']
+]
 
 
 def DrawBody(data_x, data_y, axs):
@@ -139,18 +144,59 @@ def Process_Pose(get_body_length, get_body_angle, get_nose_head_distance):
             if get_body_length: BodyLength(type, mouse, data_x, data_y)
             if get_body_angle: BodyAngle(type, mouse, data_x, data_y)
             if get_nose_head_distance: Sniffing(type, mouse, data_x, data_y)
-                
+
+
+def Compare_Pose_between_Animals(pattern, data, cluster = 5):
+    N = len(LABELS)
+    
+    fig, axs = plt.subplots(N, 1, figsize = (8, N*4))
+    for i in range(N):
+        d = data[i].reshape(-1, 1)
+        kmeans = KMeans(n_clusters=cluster, random_state=0)
+        kmeans.fit(d)
+        center = np.sort(kmeans.cluster_centers_.T[0])
+        
+        axs[i].hist(data[i], bins = 100, color = 'blue')
+        for j in range(cluster):
+            axs[i].axvline(x = center[j], color = 'red', linestyle = '--')
+        axs[i].set_ylabel(LABELS[i][0] + "-" + LABELS[i][1])
+        
+        if pattern == 'BodyLength': axs[i].set_xlim((-1, 50))
+        if pattern == 'BodyAngle': axs[i].set_xlim((-1, 180))
+        if pattern == 'Nose': axs[i].set_xlim((0, 45))
+    axs[N-1].set_xlabel(pattern)
+    plt.savefig('../Images/Social_' + pattern + '/Summary.png')
+    plt.show()
+
+def Compare_Pose(get_body_length, get_body_angle, get_nose_head_distance):  
+    BodyLength, BodyAngle, NoseActivity = [], [], []
+    for label in LABELS:
+        type, mouse = label[0], label[1]
+        mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
+        BodyLength.append(mouse_pos['bodylength'].to_numpy())
+        BodyAngle.append(mouse_pos['bodyangle'].to_numpy())
+        NoseActivity.append(mouse_pos['nose'].to_numpy())
+    
+    if get_body_length: Compare_Pose_between_Animals(pattern = 'BodyLength', data = BodyLength, cluster = 5)
+    if get_body_angle: Compare_Pose_between_Animals(pattern = 'BodyAngle', data = BodyAngle, cluster = 5)
+    if get_nose_head_distance: Compare_Pose_between_Animals(pattern = 'Nose', data = NoseActivity, cluster = 3)
+        
+        
 
 def main():
     
 
-    get_body_length = False
-    get_body_angle = False
+    get_body_length = True
+    get_body_angle = True
     get_nose_head_distance = True
 
-    Process_Pose(get_body_length,
-    get_body_angle,
-    get_nose_head_distance)
+    '''Process_Pose(get_body_length,
+                    get_body_angle,
+                    get_nose_head_distance)'''
+    
+    Compare_Pose(get_body_length,
+                    get_body_angle,
+                    get_nose_head_distance)
 
         
 

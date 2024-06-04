@@ -13,6 +13,10 @@ current_script_path = Path(__file__).resolve()
 function_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(function_dir))
 import Functions.patch as patch
+import Functions.HMM as HMM
+import Functions.kinematics as kinematics
+import Functions.patch as patch
+from SSM.ssm.plots import gradient_cmap
 
 parent_dir = current_script_path.parents[2] / 'aeon_mecha' 
 sys.path.insert(0, str(parent_dir))
@@ -23,59 +27,60 @@ from aeon.analysis.utils import visits
 from aeon.schema.schemas import social02
 from aeon.analysis.utils import visits, distancetravelled
 
+root = [Path("/ceph/aeon/aeon/data/raw/AEON2/experiment0.2")]
+
+subject_events = api.load(root, exp02.ExperimentalMetadata.SubjectState)
+sessions = visits(subject_events[subject_events.id.str.startswith("BAA-")])
+short_sessions = sessions.iloc[[4,16,17,20,23,24,25,28,29,30,31]]
+long_sessions = sessions.iloc[[8, 10, 11, 14]]
+
+feature = ['smoothed_speed', 'smoothed_acceleration', 'r']
+
+def FindModelsShort():
+    title = 'ShortSession8'
+    mouse_pos = pd.read_parquet('../Data/MousePos/' + title + 'mousepos.parquet', engine='pyarrow')
+
+    dfs = []
+    for k in range(len(short_sessions)):
+        if k == 8: continue
+        title = 'ShortSession'+str(k)
+        mouse_pos = pd.read_parquet('../Data/MousePos/' + title + 'mousepos.parquet', engine='pyarrow')
+        dfs.append(mouse_pos)
+    
+    MOUSE_POS = dfs[0]
+    for df in dfs[1:]: MOUSE_POS = MOUSE_POS.add(df, fill_value=0)
+    
+    obs = np.array(mouse_pos[feature])
+    OBS = np.array(MOUSE_POS[feature])
+    
+    LogLikelihood = []
+    N = np.arange(3,28,1)
+    for n in N:
+        hmm, states, transition_mat, lls = HMM.FitHMM(obs, num_states = n, n_iters = 50)
+        ll = hmm.log_likelihood(OBS)
+        LogLikelihood.append(ll/len(OBS[0]))
+    
+    np.save('../Data/HMMStates/LogLikelihood_Three.npy', LogLikelihood)
+
+
+def DisplayModelsShort():
+    N = np.arange(3,28,1)
+    LogLikelihood = np.load('../Data/HMMStates/LogLikelihood_Three.npy', allow_pickle=True)
+    
+
+    fig, axs = plt.subplots(1,1,figsize = (10,7))
+    axs.scatter(N, LogLikelihood)
+    axs.plot(N, LogLikelihood, color = 'black')
+    axs.set_xticks(N)
+    plt.savefig('../Images/HMM_StateChoice/LogLikelihood_Three.png')
+    plt.show()
 
 
 def main():
 
-    root = '/ceph/aeon/aeon/data/raw/AEON3/social0.2'
-    mouse_pos = pd.read_parquet('../SocialData/HMMData/' + 'Pre' + "_" + 'BAA-1104045' + '.parquet', engine='pyarrow')
-
-    start = mouse_pos.index[0]
-    end = mouse_pos.index[-1]
-
-    check_timestamp = pd.Timestamp('2024-02-03 07:59:59.980000')
-    if start < check_timestamp < end:
-        encoders = []
-        starts = [start, pd.Timestamp('2024-02-03 08:00:01.000000')]
-        ends = [pd.Timestamp('2024-02-03 07:59:58.000000'), end]
-        
-        for i in range(len(starts)):
-            encoder = aeon.load(root, social02.Patch2.Encoder, start=starts[i], end=ends[i])
-            encoders.append(encoder)
-        encoder = pd.concat(encoders, ignore_index=False)
-    else:
-        encoder = aeon.load(root, social02.Patch2.Encoder, start=start, end=end)
-
-    encoder = encoder[~encoder.index.duplicated(keep='first')]
-    encoder = encoder[::5]
-    encoder.to_parquet('encoder.parquet', engine='pyarrow')
+    FindModelsShort()
+    DisplayModelsShort()
     
-    '''w = -distancetravelled(encoder.angle).to_numpy()
-    dw = np.concatenate((np.array([0]), w[:-1]- w[1:]))
-    encoder['Distance'] = pd.Series(w, index=encoder.index)
-    encoder['DistanceChange'] = pd.Series(dw, index=encoder.index)
-    encoder['DistanceChange'] = encoder['DistanceChange'].rolling('10S').mean()
-    encoder['Move'] = np.where(abs(encoder.DistanceChange) > 0.001, 1, 0)
     
-    encoder = encoder[~encoder.index.duplicated(keep='first')]
-    
-    encoder.to_parquet('encoder.parquet', engine='pyarrow')
-    
-    if interval_seconds < 0.01: return encoder
-    groups = encoder['Move'].ne(encoder['Move'].shift()).cumsum()
-    one_groups = encoder[encoder['Move'] == 1].groupby(groups).groups
-    one_groups = list(one_groups.values())
-
-    for i in range(len(one_groups) - 1):
-        end_current_group = one_groups[i][-1]
-        start_next_group = one_groups[i + 1][0]
-        duration = start_next_group - end_current_group
-
-        if duration < pd.Timedelta(seconds=interval_seconds):
-            encoder.loc[end_current_group:start_next_group, 'Move'] = 1'''
-
-
-
-
 if __name__ == "__main__":
-        main()
+    main()

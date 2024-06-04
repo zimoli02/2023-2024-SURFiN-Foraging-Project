@@ -163,16 +163,20 @@ def Display_Along_Time():
         for i in range(n):
             df = mouse_pos[starts[i]:ends[i]]
             speed = df.smoothed_speed
-            axs[i,0].hist(speed[speed<10],bins = 100)
-            axs[i,0].set_xlim((0,10))
-            axs[i,1].hist(speed[speed>10],bins = 100)
-            axs[i,1].set_xlim((10,1000))
+            axs[i,0].hist(speed[speed<10], density = True, bins = 100)
+            axs[i,0].set_xlim((-0.5,10))
+            axs[i,0].set_ylim((0,5))
+            axs[i,1].hist(speed[speed>10], density = True, bins = 100)
+            axs[i,1].set_xlim((9.5,1000))
+            axs[i,1].set_ylim((0,0.06))
             
             acce = df.smoothed_acceleration
-            axs[i,2].hist(acce[acce<5],bins = 100)
-            axs[i,2].set_xlim((0,5))
-            axs[i,3].hist(acce[acce>5],bins = 100)
-            axs[i,3].set_xlim((5,2000))
+            axs[i,2].hist(acce[acce<5], density = True, bins = 100)
+            axs[i,2].set_xlim((-0.5,5))
+            axs[i,2].set_ylim((0,2))
+            axs[i,3].hist(acce[acce>5], density = True, bins = 100)
+            axs[i,3].set_xlim((4.5,2000))
+            axs[i,3].set_ylim((0, 0.075))
             
             axs[i,0].set_ylabel(starts[i].hour)
         

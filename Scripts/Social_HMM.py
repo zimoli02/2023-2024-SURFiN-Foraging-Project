@@ -72,6 +72,8 @@ def Calculate_TransM_From_States(N):
 def Get_Latent_States(id, n, features):
     type, mouse = LABELS[id][0], LABELS[id][1]
     mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
+    start = mouse_pos.index[0]
+    #mouse_pos = mouse_pos[start:start + pd.Timedelta('3H')]
     obs = np.array(mouse_pos[features])
     hmm, states, transition_mat, lls = HMM.FitHMM(obs, num_states = n, n_iters = 50)
     
@@ -187,6 +189,8 @@ def Get_Latent_State_Number(features, N):
     for i in range(len(LABELS)):
         type, mouse = LABELS[i][0], LABELS[i][1]
         mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
+        start = mouse_pos.index[0]
+        mouse_pos = mouse_pos[start:start + pd.Timedelta('1H')]
         
         MOUSE_POS = []
         for j in range(len(LABELS)):
@@ -198,7 +202,7 @@ def Get_Latent_State_Number(features, N):
         MOUSE_POS = pd.concat(MOUSE_POS, ignore_index=False)
         
         obs = np.array(mouse_pos[features])
-        OBS = np.array(mouse_pos_[features])
+        OBS = np.array(MOUSE_POS[features])
 
         loglikelihood = []
         for n in N:
@@ -300,11 +304,13 @@ def PelletDeliveries(t = 6, n=9):
             start, end = mouse_pos.index[0], mouse_pos.index[-1]
             
             social02.Patch1.DeliverPellet.value = 1
+            pellets_patch1 = aeon.load(root, social02.Patch1.DeliverPellet, start=start, end=end)
+            
             social02.Patch2.DeliverPellet.value = 1
+            pellets_patch2 = aeon.load(root, social02.Patch2.DeliverPellet, start=start, end=end)
+            
             social02.Patch3.DeliverPellet.value = 1
-            pellets_patch1 = api.load(root, social02.Patch1.DeliverPellet, start=start, end=end)
-            pellets_patch2 = api.load(root, social02.Patch2.DeliverPellet, start=start, end=end)
-            pellets_patch3 = api.load(root, social02.Patch3.DeliverPellet, start=start, end=end)
+            pellets_patch3 = aeon.load(root, social02.Patch3.DeliverPellet, start=start, end=end)
             
             PELLET = pd.concat([pellets_patch1,pellets_patch2, pellets_patch3], ignore_index=False)
             PELLET = PELLET.sort_index()
@@ -322,9 +328,9 @@ def PelletDeliveries(t = 6, n=9):
             next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
             if len(next_valid_state) >= 50: next_valid_state  = next_valid_state[:50]
             
-            state = np.concatenate((latest_valid_state, next_valid_state))
+            state = np.concatenate((latest_valid_state, np.array([np.nan]), next_valid_state))
             
-            if len(state) == 100: Pellets_State.append(state)
+            if len(state) == 101: Pellets_State.append(state)
 
 
     N = n
@@ -403,21 +409,21 @@ def StartVisit(n=9):
             next_valid_index = mouse_pos.loc[trigger:trigger + pd.Timedelta('6S'), 'state'].index
             next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
             if len(next_valid_state) >= 50: next_valid_state  = next_valid_state[:50]
-            state = np.concatenate((latest_valid_state, next_valid_state))
-            if len(state) == 0: continue
+            state = np.concatenate((latest_valid_state, np.array([np.nan]), next_valid_state))
             
-            STATE.append(state)
-            DURATION.append(Visits.iloc[i]['duration'])
+            if len(state) == 251: 
+                STATE.append(state)
+                DURATION.append(Visits.iloc[i]['duration'])
 
     index = np.argsort(DURATION)
-    STATES = np.array(STATES)[index]
+    STATE = np.array(STATE)[index]
     
     N = n
     colors = sns.xkcd_palette(color_names[0:N])
     cmap = gradient_cmap(colors)
 
     fig, axs = plt.subplots(1, 1, figsize=(10, 16))
-    sns.heatmap(STATES,cmap=cmap, ax=axs, vmin=0, vmax = N-1, cbar = True)
+    sns.heatmap(STATE, cmap=cmap, ax=axs, vmin=0, vmax = N-1, cbar = True)
     axs.set_aspect('auto')
     
     axs.set_xticks([200])
@@ -429,11 +435,11 @@ def StartVisit(n=9):
     plt.savefig('../Images/Social_HMM/EnterVisit.png')
     plt.show()
     
-    
+
     AVE_STATES = []
     AVE_STATES_D = []
     for k in np.arange(n):
-        index = STATES == k
+        index = STATE == k
         states = index*1
         AVE_STATES.append(np.mean(states, axis = 0))
         AVE_STATES_D.append(np.mean(states, axis = 1))
@@ -451,7 +457,7 @@ def StartVisit(n=9):
     plt.savefig('../Images/Social_HMM/EnterVisit_' + 'EachState' + '.png')
     plt.show()
     
-    
+    '''
     fig, axs = plt.subplots(1, 1, figsize=(4, 16))
     sns.heatmap(np.array(AVE_STATES_D).T,ax=axs)
     axs.set_aspect('auto')
@@ -460,7 +466,7 @@ def StartVisit(n=9):
     axs.set_yticks([])
 
     plt.savefig('../Images/Social_HMM/EnterVisit_' + 'EachState_D' + '.png')
-    plt.show()
+    plt.show()'''
     
 def EndVisit(n=9):    
     STATES, DURATION = [],[]
@@ -475,6 +481,7 @@ def EndVisit(n=9):
         Visits['distance'] = abs(Visits['distance'])
         Visits = Visits[Visits['distance'] >= 0.1]
         
+        '''        
         for i in range(len(Visits)):
             trigger = Visits.iloc[i]['end']
             
@@ -485,10 +492,28 @@ def EndVisit(n=9):
             next_valid_index = mouse_pos.loc[trigger:trigger + pd.Timedelta('21S'), 'state'].index
             next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
             if len(next_valid_state) >= 200: next_valid_state  = next_valid_state[:200]
-            state = np.concatenate((latest_valid_state, next_valid_state))
+            state = np.concatenate((latest_valid_state, np.array([0]), next_valid_state))
             if len(state) == 0: continue
             STATES.append(state)
             DURATION.append(Visits.iloc[i]['duration'])
+            '''
+        
+        for i in range(len(Visits)):
+            trigger = Visits.iloc[i]['end']
+            
+            latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('21S'):trigger, 'state'].index
+            latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
+            if len(latest_valid_state) >= 200: latest_valid_state  = latest_valid_state[-200:]
+            
+            next_valid_index = mouse_pos.loc[trigger:trigger + pd.Timedelta('6S'), 'state'].index
+            next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
+            if len(next_valid_state) >= 50: next_valid_state  = next_valid_state[:50]
+            
+            state = np.concatenate((latest_valid_state, np.array([np.nan]), next_valid_state))
+            
+            if len(state) == 251: 
+                STATES.append(state)
+                DURATION.append(Visits.iloc[i]['duration'])
 
     index = np.argsort(DURATION)
     STATES = np.array(STATES)[index]
@@ -500,7 +525,7 @@ def EndVisit(n=9):
     sns.heatmap(STATES,cmap=cmap, ax=axs, vmin=0, vmax = N-1, cbar = True)
     axs.set_aspect('auto')
     
-    axs.set_xticks([50])
+    axs.set_xticks([200])
     axs.set_xticklabels(['Leave'], rotation = 0)
 
     axs.set_ylabel("Visits")
@@ -528,23 +553,23 @@ def main():
                         bodylength_Update = True,
                         bodyangle_Update = True,
                         nose_Update = True)
-        
+
     
-    Get_Latent_State_Number(features, N = np.arange(3,20))
+    Get_Latent_State_Number(features, N = np.arange(3,28))
     
-    Display_Latent_State_Number(N = np.arange(3,20))
-    '''
+    Display_Latent_State_Number(N = np.arange(3,28))
+    '''  
     
     
-    #Get_Latent_States(id=1, n=9, features = features)
-    #Display_Latent_States(N = 9)
-    #Calculate_TransM_From_States(N=9)
+    Get_Latent_States(id=3, n=12, features = features)
+    Display_Latent_States(N = 12)
+    Calculate_TransM_From_States(N=12)
     
-    Get_States_Characterized(pellet_delivery = False,
-                                state_before_visit = False,
+    Get_States_Characterized(pellet_delivery = True,
+                                state_before_visit = True,
                                 start_visit = True,
-                                end_visit = False,
-                                N=9)
+                                end_visit = True,
+                                N=12)
 
 
 if __name__ == "__main__":

@@ -299,11 +299,14 @@ def VisitIntervals(Patches = []):
     Visits['last_pellets_self'] = 0
     Visits['last_pellets_other'] = 0
     Visits['interval'] = 0
+    Visits['last_duration'] = 0
+    Visits['last_pellets_interval'] = 0
     
     for i in range(1,len(Visits)):
         start, end = Visits.start[i], Visits.end[i]
         last_end = Visits.end[i-1]
         Visits.loc[i, 'interval'] = (start - last_end).total_seconds()
+        Visits.loc[i, 'last_duration'] = Visits.loc[i-1, 'duration']
         
         self_patch, other_patch = False, False
         self_pellet, other_pellet = 0, 0
@@ -317,6 +320,11 @@ def VisitIntervals(Patches = []):
                 self_patch = True
         Visits.loc[i, 'last_pellets_self'] = self_pellet
         Visits.loc[i, 'last_pellets_other'] = other_pellet
+        
+        if Visits.loc[i-1, 'pellet'] > 0:
+            Visits.loc[i, 'last_pellets_interval'] = Visits.loc[i, 'interval']
+        else:
+            Visits.loc[i, 'last_pellets_interval'] = Visits.loc[i, 'interval'] + Visits.loc[i-1, 'last_pellets_interval'] + Visits.loc[i-1, 'duration']
 
     return Visits
 
@@ -512,59 +520,3 @@ def DrawVisitInPatch(mouse_pos, pellets_patch1, pellets_patch2):
 
     
     plt.show()
-    
-    
-def SimpleLinearRegression(X, y):
-    model = LinearRegression()
-    model.fit(X, y)
-
-    coefficients = model.coef_
-    intercept = model.intercept_
-
-    y_pred = model.predict(X)
-
-    mse = mean_squared_error(y, y_pred)
-    r2 = r2_score(y, y_pred)
-    
-    return coefficients, intercept, y_pred, mse, r2
-
-def ComparePrediction(y1, y1_predicted, y2, y2_predicted):  
-    fig, axs = plt.subplots(4, 1, figsize=(30, 5), sharex=True)
-
-    axs[0].plot(y2, color = 'green')
-    axs[0].set_xticks([]) 
-    #axs[0].set_yticks([]) 
-    axs[0].set_facecolor('white') 
-    axs[0].set_ylabel('P2', fontsize = 12)
-    axs[0].spines['top'].set_visible(False)
-    axs[0].spines['right'].set_visible(False)
-
-    axs[1].plot(y2_predicted, color = 'green')
-    axs[1].set_xticks([]) 
-    #axs[1].set_yticks([]) 
-    axs[1].set_facecolor('white') 
-    axs[1].set_ylabel('P2 Pred.', fontsize = 14)
-    axs[1].spines['top'].set_visible(False)
-    axs[1].spines['right'].set_visible(False)
-
-    axs[2].plot(y1, color = 'brown')
-    #axs[2].set_yticks([])  
-    axs[2].set_facecolor('white')  
-    axs[2].set_ylabel('P1', fontsize = 14)
-    axs[2].spines['top'].set_visible(False)
-    axs[2].spines['right'].set_visible(False)
-    #axs[2].set_xlim(start, end)
-    
-    axs[3].plot(y1_predicted, color = 'brown')
-    axs[3].set_xticks([]) 
-    #axs[3].set_yticks([]) 
-    axs[3].set_facecolor('white') 
-    axs[3].set_ylabel('P1 Pred.', fontsize = 12)
-    axs[3].spines['top'].set_visible(False)
-    axs[3].spines['right'].set_visible(False)
-    #axs[3].set_xlim(start, end)
-    
-    plt.show()
-    
-    
-    
