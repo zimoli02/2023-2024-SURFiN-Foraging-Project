@@ -560,15 +560,15 @@ def main():
     '''
     
     
-    '''Get_Latent_States(id=3, n=10, features = features)
-    Display_Latent_States(N = 10)'''
-    Calculate_TransM_From_States(N=10)
+    Get_Latent_States(id=3, n=7, features = features)
+    Display_Latent_States(N = 7)
+    Calculate_TransM_From_States(N=7)
     
     Get_States_Characterized(pellet_delivery = True,
                                 state_before_visit = False,
                                 start_visit = True,
                                 end_visit = True,
-                                N=10)
+                                N=7)
 
 
 if __name__ == "__main__":

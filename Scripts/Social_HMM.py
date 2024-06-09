@@ -40,6 +40,13 @@ LABELS = [
     ['Post','BAA-1104047']
 ]
 
+'''
+LABELS = [
+    ['Pre','BAA-1104045'],
+    ['Pre','BAA-1104047'],
+    ['Post','BAA-1104047']
+]'''
+
 color_names = ['black', "blue", "red", "tan", "green", "brown", "purple", "orange", 'turquoise', "yellow", 'pink', 'darkblue']
 
 def FixNan(mouse_pos, column):
@@ -72,8 +79,7 @@ def Calculate_TransM_From_States(N):
 def Get_Latent_States(id, n, features):
     type, mouse = LABELS[id][0], LABELS[id][1]
     mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
-    start = mouse_pos.index[0]
-    #mouse_pos = mouse_pos[start:start + pd.Timedelta('3H')]
+
     obs = np.array(mouse_pos[features])
     hmm, states, transition_mat, lls = HMM.FitHMM(obs, num_states = n, n_iters = 50)
     
@@ -558,12 +564,12 @@ def main():
     Get_Latent_State_Number(features, N = np.arange(3,28))
     
     Display_Latent_State_Number(N = np.arange(3,28))
-    '''  
+    '''
     
     
-    Get_Latent_States(id=3, n=12, features = features)
+    Get_Latent_States(id=, n=12, features = features)
     Display_Latent_States(N = 12)
-    Calculate_TransM_From_States(N=12)
+    Calculate_TransM_From_States(N=12)  
     
     Get_States_Characterized(pellet_delivery = True,
                                 state_before_visit = True,

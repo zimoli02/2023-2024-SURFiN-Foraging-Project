@@ -247,7 +247,7 @@ def Social_Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10, arena_r 
         
     entry = EnterArena(mouse_pos, arena_r)
         
-    Visits = {'start':[],'end':[], 'distance':[], 'duration':[], 'speed':[], 'acceleration':[], 'entry':[], 'patch':[], 'pellet':[]}
+    Visits = {'start':[],'end':[], 'distance':[], 'duration':[], 'speed':[], 'acceleration':[], 'bodylength':[], 'bodyangle':[], 'nose' : [],'entry':[], 'patch':[], 'pellet':[]}
     
     groups = encoder['Move'].ne(encoder['Move'].shift()).cumsum()
     visits = encoder[encoder['Move'] == 1].groupby(groups)['Move']
@@ -271,6 +271,10 @@ def Social_Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10, arena_r 
         
         Visits['speed'].append(pre_visit_data['smoothed_speed'].mean())
         Visits['acceleration'].append(pre_visit_data['smoothed_acceleration'].mean())
+        Visits['bodylength'].append(pre_visit_data['bodylength'].mean())
+        Visits['bodyangle'].append(pre_visit_data['bodyangle'].mean())
+        Visits['nose'].append(pre_visit_data['nose'].mean())
+        
         #Visits['weight'].append(pre_visit_data['weight'].mean())
         #Visits['state'].append(pre_visit_data['states'].value_counts().idxmax())
         
@@ -293,19 +297,22 @@ def Social_Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10, arena_r 
 
 def VisitIntervals(Patches = []):
     Visits = pd.concat(Patches, ignore_index=True)
-    Visits = Visits[abs(Visits['distance']) >= 0.1]
+    
+    Visits = Visits[abs(Visits['distance']) >= 1]
     Visits = Visits.sort_values(by='start',ignore_index=True)  
     
     Visits['last_pellets_self'] = 0
     Visits['last_pellets_other'] = 0
-    Visits['interval'] = 0
+    Visits['last_interval'] = 0
+    Visits['next_interval'] = 0
     Visits['last_duration'] = 0
     Visits['last_pellets_interval'] = 0
     
     for i in range(1,len(Visits)):
         start, end = Visits.start[i], Visits.end[i]
         last_end = Visits.end[i-1]
-        Visits.loc[i, 'interval'] = (start - last_end).total_seconds()
+        Visits.loc[i, 'last_interval'] = (start - last_end).total_seconds()
+        Visits.loc[i-1, 'next_interval'] = Visits.loc[i, 'last_interval'] 
         Visits.loc[i, 'last_duration'] = Visits.loc[i-1, 'duration']
         
         self_patch, other_patch = False, False
@@ -322,10 +329,15 @@ def VisitIntervals(Patches = []):
         Visits.loc[i, 'last_pellets_other'] = other_pellet
         
         if Visits.loc[i-1, 'pellet'] > 0:
-            Visits.loc[i, 'last_pellets_interval'] = Visits.loc[i, 'interval']
+            Visits.loc[i, 'last_pellets_interval'] = Visits.loc[i, 'last_interval']
         else:
-            Visits.loc[i, 'last_pellets_interval'] = Visits.loc[i, 'interval'] + Visits.loc[i-1, 'last_pellets_interval'] + Visits.loc[i-1, 'duration']
-
+            Visits.loc[i, 'last_pellets_interval'] = Visits.loc[i, 'last_interval'] + Visits.loc[i-1, 'last_pellets_interval'] + Visits.loc[i-1, 'duration']
+    
+    Visits = Visits.dropna(subset=['speed'])
+    Visits['distance'] = abs(Visits['distance'])
+    Visits = Visits[Visits['last_interval'] >= 0]
+    Visits = Visits[Visits['next_interval'] >= 0]
+        
     return Visits
 
 

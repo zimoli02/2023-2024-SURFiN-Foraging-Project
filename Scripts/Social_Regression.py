@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+import scipy.stats as stats
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.metrics import mean_squared_error, r2_score
@@ -41,57 +42,73 @@ LABELS = [
     ['Post','BAA-1104047']
 ]
 
+STARTS = [
+    [pd.Timestamp('2024-01-31 11:28:39.00'), pd.Timestamp('2024-02-01 22:36:47.00'), pd.Timestamp('2024-02-02 00:15:00.00')],
+    [pd.Timestamp('2024-02-05 15:43:07.00')],
+    [pd.Timestamp('2024-02-25 17:22:33.00')],
+    [pd.Timestamp('2024-02-28 13:54:17.00'), pd.Timestamp('2024-03-01 16:46:17.520991801')]
+]
+
 
 def ConcatenateSessions():
     dfs = []
     for i in range(len(LABELS)):
         type, mouse = LABELS[i][0], LABELS[i][1]
         Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
-        
-        Visits = Visits.dropna(subset=['speed'])
-        Visits['distance'] = abs(Visits['distance'])
-        Visits = Visits[Visits['distance'] >= 0.1]
-        
         dfs.append(Visits)
         
     VISIT = pd.concat(dfs, ignore_index=True)
+    VISIT = VISIT.sort_values(by='start',ignore_index=True) 
     
     return VISIT
 
 def Process_Visits():
+    pre_period_seconds = 10
+    arena_r = 511
     for i in range(len(LABELS)):
         print(i)
         type, mouse = LABELS[i][0], LABELS[i][1]
         mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
         
-        try:
-            Visits_Patch1 = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit1.parquet', engine='pyarrow')
-        except FileNotFoundError:
-            Visits_Patch1 = patch.Social_Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 30, arena_r = 511)
-            Visits_Patch1.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit1.parquet', engine='pyarrow')
+        VISITS = []
         
-        try:
-            Visits_Patch2 = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit2.parquet', engine='pyarrow')
-        except FileNotFoundError:
-            Visits_Patch2 = patch.Social_Visits(mouse_pos, patch = 'Patch2', pre_period_seconds = 30, arena_r = 511)
-            Visits_Patch2.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit2.parquet', engine='pyarrow')
+        starts = STARTS[i]
+        for j in range(len(starts)):
+            if j == len(starts) - 1: mouse_pos_ = mouse_pos[starts[j]:]
+            else: mouse_pos_ = mouse_pos[starts[j]:starts[j+1]]
+
+            try:
+                Visits_Patch1 = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse + "_" + str(j) + '_Visit1.parquet', engine='pyarrow')
+            except FileNotFoundError:
+                Visits_Patch1 = patch.Social_Visits(mouse_pos_, patch = 'Patch1', pre_period_seconds = pre_period_seconds, arena_r = arena_r)
+                Visits_Patch1.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse + "_" + str(j) + '_Visit1.parquet', engine='pyarrow')
+            
+            try:
+                Visits_Patch2 = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse + "_" + str(j) + '_Visit2.parquet', engine='pyarrow')
+            except FileNotFoundError:
+                Visits_Patch2 = patch.Social_Visits(mouse_pos_, patch = 'Patch2', pre_period_seconds = pre_period_seconds, arena_r = arena_r)
+                Visits_Patch2.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse + "_" + str(j) + '_Visit2.parquet', engine='pyarrow')
+            
+            try:
+                Visits_Patch3 = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse + "_" + str(j) + '_Visit3.parquet', engine='pyarrow')
+            except FileNotFoundError:
+                Visits_Patch3 = patch.Social_Visits(mouse_pos_, patch = 'Patch3', pre_period_seconds = pre_period_seconds, arena_r = arena_r)
+                Visits_Patch3.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse + "_" + str(j) + '_Visit3.parquet', engine='pyarrow')
         
-        try:
-            Visits_Patch3 = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit3.parquet', engine='pyarrow')
-        except FileNotFoundError:
-            Visits_Patch3 = patch.Social_Visits(mouse_pos, patch = 'Patch3', pre_period_seconds = 30, arena_r = 511)
-            Visits_Patch3.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit3.parquet', engine='pyarrow')
-        
-        Visits = patch.VisitIntervals([Visits_Patch1, Visits_Patch2, Visits_Patch3]) 
-        Visits.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
+            Visits = patch.VisitIntervals([Visits_Patch1, Visits_Patch2, Visits_Patch3]) 
+            VISITS.append(Visits)
+            
+        VISITS = pd.concat(VISITS, ignore_index=True)
+        VISITS = VISITS.sort_values(by='start',ignore_index=True) 
+        VISITS.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
 
 
 def Variables(VISIT, feature, predictor = 'distance'):
     X = VISIT[feature]
-    #scaler = StandardScaler()
-    # X = pd.DataFrame(scaler.fit_transform(X), index = X.index, columns = X.columns)
-    #X['interc'] = 1
-    Y = VISIT[predictor]
+    scaler = StandardScaler()
+    X = pd.DataFrame(scaler.fit_transform(X), index = X.index, columns = X.columns)
+    X['interc'] = 1
+    Y = VISIT[[predictor]]
     
     ''' 
     poly = PolynomialFeatures(degree=2)
@@ -122,10 +139,9 @@ def CrossValidation(X, Y, type, split_perc = 0.75):
     split_size = int(len(Y) * split_perc)
     indices = np.arange(len(Y))
     
-    MSE = []
-    MSE_min = 1e10
+    MSE_min = 1e20
     
-    for i in range(1000):
+    for i in range(100):
         np.random.shuffle(indices)
         
         train_indices = indices[:split_size]
@@ -138,69 +154,62 @@ def CrossValidation(X, Y, type, split_perc = 0.75):
         result = model.fit()
         Y_test_pred = result.predict(X_test)
         
-        mse = np.mean((Y_test_pred - Y_test) ** 2)
-        
-        MSE.append(mse)
-        
+        mse = np.mean((Y_test_pred.to_numpy() - Y_test.to_numpy()) ** 2)
         if mse < MSE_min:  
             result_valid = result
             MSE_min = mse
     
-    return result_valid, np.mean(MSE)
+    return result_valid, MSE_min
         
     
 def Model(X, Y, type = 'Poisson'):
     
     result, average_mse = CrossValidation(X, Y, type)
     y_pred = result.predict(X)
-    
-    '''model = FitModel(X,Y,type)
-    result = model.fit()
-    y_pred = result.predict(X)
-    average_mse = np.mean((y_pred - Y) ** 2)'''
-    
+
     return result, y_pred, average_mse
 
 def PlotModelPrediction(obs, pred, predictor, TYPE, title):
-    fig, axs = plt.subplots(2, 1, figsize=(15, 5), sharex=True)
-    axs[0].plot(obs.to_numpy(), color = 'black')
-    axs[0].set_xticks([]) 
-    axs[0].set_facecolor('white') 
-    axs[0].set_ylabel(predictor, fontsize = 12)
-    axs[0].spines['top'].set_visible(False)
-    axs[0].spines['right'].set_visible(False)
+    N = np.arange(0, len(pred), 1)
+    obs = obs.to_numpy().reshape(1,-1)[0]
+    pred = pred.to_numpy().reshape(1,-1)[0]
+    
+    fig, axs = plt.subplots(1, 1, figsize=(40, 3), sharex=True)
+    axs.plot(N, obs, color = 'black')
+    axs.set_xticks([]) 
+    axs.set_facecolor('white') 
+    axs.set_ylabel(predictor, fontsize = 12)
+    axs.spines['top'].set_visible(False)
+    axs.spines['right'].set_visible(False)
 
-    #axs[1].plot(pred.to_numpy(), color = 'blue', label = 'Correlation: '+str(round(np.corrcoef(obs, pred)[0,1],4)))
-    axs[1].plot(pred, color = 'blue', label = 'Correlation: '+str(round(np.corrcoef(obs, pred)[0,1],4)))
-    axs[1].set_xticks([]) 
-    axs[1].set_facecolor('white') 
-    axs[1].set_ylabel(predictor + ' Pred.', fontsize = 14)
-    axs[1].spines['top'].set_visible(False)
-    axs[1].spines['right'].set_visible(False)
-    axs[1].legend()
+    axs_ = axs.twinx()
+    axs_.plot(N, pred, color = 'blue', label = 'Correlation: '+str(round(np.corrcoef(obs, pred)[0,1],4)))
+    axs_.set_xticks([]) 
+    axs_.set_facecolor('white') 
+    axs_.set_ylabel(predictor + ' Pred.', fontsize = 14)
+    axs_.spines['top'].set_visible(False)
+    axs_.spines['left'].set_visible(False)
+    axs_.legend()
+    
+    #axs_.set_ylim(axs.get_ylim())
         
     plt.savefig('../Images/Social_Regression/'+ title + "/" + TYPE + '_Prediction.png')
     plt.show()
 
 
+
 def PlotModelPrediction_Residual(obs, pred, predictor, TYPE, title):
+    obs = obs.to_numpy().reshape(1,-1)[0]
+    pred = pred.to_numpy().reshape(1,-1)[0]
+    
     fig, axs = plt.subplots(1, 1, figsize=(10, 10))
-    x = obs.to_numpy()
-    #y = pred.to_numpy()
-    y = pred
-    axs.scatter(x, y-x, s = 10)
-    
-    x_ = np.arange(0,2501,100)
-    #axs.plot(x_, x_, color = 'red', linestyle = ':', linewidth = 1, label = 'y = x')
-    
+    axs.scatter(obs, pred-obs, s = 10)    
     axs.set_xlabel('Observed '+ predictor[0].upper() + predictor[1:] + ' (mm)', fontsize = 24)
     axs.set_ylabel('Residuals (mm)', fontsize = 24)
-    #axs.set_aspect('equal', adjustable='box')
-    #axs.set_xlim(0,2500)
-    #axs.set_ylim(0,2500)
     axs.spines['top'].set_visible(False)
     axs.spines['right'].set_visible(False)
     #axs.legend(fontsize = 20)
+    axs.set_ylim((-max(obs)-1, max(obs)+1))
 
     plt.tight_layout()
     plt.savefig('../Images/Social_Regression/' + title + "/" + TYPE + '_Prediction_Scatter.png')
@@ -218,28 +227,53 @@ def PrintModelSummary(result, TYPE, title):
 
 
 def Fit_Models(Visits, FEATURES, MODELS, PREDICTOR, type, mouse):
+    def sigmoid(x, midpoint, scale):
+        return 1 / (1 + np.exp(-(x - midpoint) / scale))
+
     X, Y = Variables(Visits, feature = FEATURES, predictor=PREDICTOR)
     
     for MODEL in MODELS:
-        result, y_pred, average_mse = Model(X, Y, type = MODEL)
-        print("Average MSE per Prediction for " + type + "-" + mouse + " " + MODEL + " Model Fitted: ", average_mse)
+        corre_max = -1
+        for i in range(50, 400):
+            for j in range(20, 60):
+                Y_ = sigmoid(Y, midpoint = i, scale = j)
+                result, y_pred, average_mse = Model(X, Y_, type = MODEL)
+                average_mse = average_mse/np.mean(Y_)
+                print("Average MSE per Prediction for " + type + "-" + mouse + " " + MODEL + " Model Fitted: ", average_mse)
+                
+                obs = Y_.to_numpy().reshape(1,-1)[0]
+                pred = y_pred.to_numpy().reshape(1,-1)[0]
+                corre = np.corrcoef(obs, pred)[0,1]
+                
+                if corre > corre_max:  
+                    result_valid = result
+                    y_pred_valid = y_pred
+                    midpoint_valid = i 
+                    scale_valid = j
+                    corre_max = corre
 
-        PlotModelPrediction(Y, y_pred, predictor=PREDICTOR, TYPE = MODEL, title = type + "-" + mouse)
-        PlotModelPrediction_Residual(Y, y_pred, predictor=PREDICTOR, TYPE = MODEL, title = type + "-" + mouse)
+        #y_pred =  np.exp(y_pred) - 1 
+        
+        PlotModelPrediction(Y_, y_pred_valid, predictor=PREDICTOR, TYPE = MODEL, title = type + "-" + mouse)
+        PlotModelPrediction_Residual(Y_, y_pred_valid, predictor=PREDICTOR, TYPE = MODEL, title = type + "-" + mouse)
         PrintModelSummary(result, MODEL, title = type + "-" + mouse)
+        print('Midpoint:', midpoint_valid)
+        print('Scale:', scale_valid)
 
 def main():
     #Process_Visits()
-    #Visits = ConcatenateSessions()
-    #Fit_Models(Visits, FEATURES = ['speed','acceleration', 'last_pellets_self', 'last_pellets_other', 'interval' , 'last_pellets_interval', 'entry'], MODELS = ['Poisson', 'Gaussian', 'Gamma'], PREDICTOR = 'duration')
-    for i in range(len(LABELS)):
+    Visits = ConcatenateSessions()
+    Fit_Models(Visits, FEATURES = ['speed','acceleration','bodylength','bodyangle','nose','last_pellets_self', 'last_pellets_other','last_duration', 'last_interval','last_pellets_interval', 'entry'], MODELS = ['Gaussian'], PREDICTOR = 'duration', type = 'All', mouse = 'Mice')
+    
+    '''for i in range(len(LABELS)):
+        #if i != 0: break
         type, mouse = LABELS[i][0], LABELS[i][1]
         Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
         
-        Visits = Visits.dropna(subset=['speed'])
-        Visits['distance'] = abs(Visits['distance'])
-        Visits = Visits[Visits['distance'] >= 0.1]
+        #Visits = Visits[Visits['next_interval'] <= 3600]
+        Visits = Visits.sort_values(by='start',ignore_index=True)  
         
-        Fit_Models(Visits, FEATURES = ['last_pellets_self', 'last_pellets_other', 'interval' , 'last_duration', 'last_pellets_interval', 'entry'], MODELS = ['Poisson','Gaussian'], PREDICTOR = 'duration', type = type, mouse = mouse)    
+        Fit_Models(Visits, FEATURES = ['speed','acceleration','bodylength','bodyangle','nose','last_pellets_self', 'last_pellets_other','last_duration', 'last_interval','last_pellets_interval', 'entry'], MODELS = ['Gaussian'], PREDICTOR = 'duration', type = type, mouse = mouse)
+        '''
 if __name__ == "__main__":
     main()

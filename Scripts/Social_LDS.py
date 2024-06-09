@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import scipy.stats as stats
 from pathlib import Path
 
 import sys
@@ -141,7 +142,83 @@ def Display():
             axs[i].set_ylim(0, 1150)
         plt.savefig('../Images/Positions/' + start +'.png')
         plt.show()'''
+
+def Calculate_Distribution(dist):
+    mean = np.mean(dist)
+    variance = np.var(dist)
+    skewness = stats.skew(dist)
+    kurtosis = stats.kurtosis(dist)
+    return mean, variance, skewness, kurtosis
+
+def Calculate_Along_Time():
+    for label in LABELS:
+        type, mouse = label[0], label[1]
+        mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
+
+        start = mouse_pos.index[0]
+        end = mouse_pos.index[-1]
+        starts, ends = [],[]
+        while start < end:
+            if start.minute != 0:
+                end_ = pd.Timestamp(year = start.year, month = start.month, day = start.day, hour = start.hour+1, minute=0, second=0)
+            else: 
+                end_ = start + pd.Timedelta('1H')
+
+            starts.append(start)
+            ends.append(end_)
+            start = end_        
+        
+        Mean_V, Variance_V, Skewness_V, Kurtosis_V = [], [], [], []
+        Mean_A, Variance_A, Skewness_A, Kurtosis_A = [], [], [], []
+        Hour = []
+        n = len(starts)
+        
+        CR = []
+        for i in range(n):
+            df = mouse_pos[starts[i]:ends[i]]
+            speed = df.smoothed_speed
+            mean, variance, skewness, kurtosis = Calculate_Distribution(speed)
+            Mean_V.append(mean)
+            Variance_V.append(variance)
+            Skewness_V.append(skewness)
+            Kurtosis_V.append(kurtosis)
             
+            acce = df.smoothed_acceleration
+            mean, variance, skewness, kurtosis = Calculate_Distribution(acce)
+            Mean_A.append(mean)
+            Variance_A.append(variance)
+            Skewness_A.append(skewness)
+            Kurtosis_A.append(kurtosis)
+            
+            Hour.append(starts[i].hour)
+            if starts[i].hour == 7 or starts[i].hour == 19: CR.append(i)
+        CR = np.array(CR)
+        if starts[CR[0]].hour == 19: CR = np.concatenate((np.array([0]), CR))
+        if starts[CR[-1]].hour == 7: CR = np.concatenate((CR, np.array([n-1])))
+        
+        N = np.arange(n)
+        fis, axs = plt.subplots(4, 2, figsize = (30, 20))
+        axs[0,0].plot(N, Mean_V)
+        axs[0,0].set_ylabel('Mean')
+        axs[1,0].plot(N, Variance_V)
+        axs[1,0].set_ylabel('Variance')
+        axs[2,0].plot(N, Skewness_V)
+        axs[2,0].set_ylabel('Skewness')
+        axs[3,0].plot(N, Kurtosis_V)
+        axs[3,0].set_ylabel('Kurtosis')
+        axs[0,1].plot(N, Mean_A)
+        axs[1,1].plot(N, Variance_A)
+        axs[2,1].plot(N, Skewness_A)
+        axs[3,1].plot(N, Kurtosis_A)
+        axs[3,0].set_ylabel('Speed')
+        axs[3,1].set_ylabel('Acceleration')
+        for i in range(4):
+            for j in range(2):
+                axs[i,j].set_xticks(N[::2], Hour[::2])
+                for t in range(0,len(CR),2):
+                    axs[i,j].axvspan(CR[t],CR[t+1], color='lightblue', alpha=0.5)
+        plt.savefig('../Images/Social_LDS/' + type + '_' + mouse +'_Kinematics_Distribution_with_Time.png')
+        plt.show()
 
 def Display_Along_Time():
     for label in LABELS:
@@ -182,6 +259,7 @@ def Display_Along_Time():
         
         plt.savefig('../Images/Social_LDS/' + type + '_' + mouse +'_Kinematics_with_Time.png')
         plt.show()
+        
 
 def main():
     
@@ -196,7 +274,8 @@ def main():
     #Get_Inference()
     #Display()
     
-    Display_Along_Time()
+    #Display_Along_Time()
+    Calculate_Along_Time()
         
 
 if __name__ == "__main__":
