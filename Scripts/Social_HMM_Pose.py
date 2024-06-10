@@ -72,6 +72,8 @@ def Calculate_TransM_From_States(N):
 def Get_Latent_States(id, n, features):
     type, mouse = LABELS[id][0], LABELS[id][1]
     mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
+    mouse_pos = mouse_pos[pd.Timestamp('2024-02-06 07:00:00.0'):pd.Timestamp('2024-02-07 07:00:00.0')]
+    
     obs = np.array(mouse_pos[features])
     hmm, states, transition_mat, lls = HMM.FitHMM(obs, num_states = n, n_iters = 50)
     
@@ -560,16 +562,22 @@ def main():
     '''
     
     
-    Get_Latent_States(id=3, n=7, features = features)
-    Display_Latent_States(N = 7)
-    Calculate_TransM_From_States(N=7)
+    Get_Latent_States(id=1, n=12, features = features)
+    print('Get_Latent_States Completed')
+    
+    Display_Latent_States(N = 12)
+    print('Display_Latent_States Completed')
+    
+    Calculate_TransM_From_States(N=12)
+    print('Calculate_TransM_From_States Completed')
+    
     
     Get_States_Characterized(pellet_delivery = True,
                                 state_before_visit = False,
                                 start_visit = True,
                                 end_visit = True,
-                                N=7)
-
+                                N=12)
+    print('Get_States_Characterized Completed')
 
 if __name__ == "__main__":
         main()

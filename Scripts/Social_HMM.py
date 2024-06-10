@@ -79,7 +79,8 @@ def Calculate_TransM_From_States(N):
 def Get_Latent_States(id, n, features):
     type, mouse = LABELS[id][0], LABELS[id][1]
     mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
-
+    mouse_pos = mouse_pos[pd.Timestamp('2024-02-06 07:00:00.0'):pd.Timestamp('2024-02-07 07:00:00.0')]
+    
     obs = np.array(mouse_pos[features])
     hmm, states, transition_mat, lls = HMM.FitHMM(obs, num_states = n, n_iters = 50)
     
@@ -188,6 +189,45 @@ def Display_Latent_States(N):
     plt.savefig('../Images/Social_HMM/Data.png')
     plt.show()
 
+def Display_Latent_States_Along_Time(N):
+    for label in LABELS:
+        type, mouse = label[0], label[1]
+        mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
+        states = np.load('../SocialData/HMMStates/' + type + "_" + mouse + "_States.npy", allow_pickle = True)
+        mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
+        
+        grouped = mouse_pos.groupby([pd.Grouper(freq='10S'), 'state']).size()
+        prob = grouped.groupby(level=0).apply(lambda g: g / g.sum())
+        states_prob = prob.unstack(level=-1).fillna(0)
+        states_prob.index = states_prob.index.get_level_values(0)
+        
+        states_prob['CR'] = 0
+        CR_index_1 = states_prob[states_prob.index.hour < 7].index
+        CR_index_2 = states_prob[states_prob.index.hour > 19].index
+        CR_index = CR_index_1.union(CR_index_2).sort_values()
+        states_prob.loc[CR_index, 'CR'] = 1
+        
+        groups = states_prob['CR'].ne(states_prob['CR'].shift()).cumsum()
+        zero_groups = states_prob[states_prob['CR'] == 0].groupby(groups).groups
+        zero_groups = list(zero_groups.values())
+
+        START, END = [],[]
+        for i in range(len(zero_groups)):
+            START.append(zero_groups[i][0])
+            END.append(zero_groups[i][-1])
+
+
+        fig, axs = plt.subplots(N, 1, figsize=(35, 4*N-1))
+        for i in range(N):
+            states_prob[i].plot(ax = axs[i])
+            for t in range(len(START)):
+                axs[i].axvspan(START[t],END[t], color='lightblue', alpha=0.5)
+        
+        plt.savefig('../Images/Social_HMM/EachState/' + type + "_" +mouse+'.png')
+        plt.show()
+                
+        
+        
 
 def Get_Latent_State_Number(features, N):
     LogLikelihood = []
@@ -550,7 +590,8 @@ def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,s
 
 def main():
     
-    features = ['smoothed_speed', 'smoothed_acceleration', 'r','bodylength', 'bodyangle', 'nose']
+    #features = ['smoothed_speed', 'smoothed_acceleration', 'r','bodylength', 'bodyangle', 'nose']
+    features = ['smoothed_speed', 'smoothed_acceleration', 'r']
     
     '''Get_Observations(kinematics_Update = False,   
                         weight_Update = False,
@@ -559,23 +600,34 @@ def main():
                         bodylength_Update = True,
                         bodyangle_Update = True,
                         nose_Update = True)
-
+    print('Get_Observations Completed')
     
     Get_Latent_State_Number(features, N = np.arange(3,28))
+    print('Get_Latent_State_Number Completed')
     
     Display_Latent_State_Number(N = np.arange(3,28))
+    print('Display_Latent_State_Number Completed')
     '''
     
     
-    Get_Latent_States(id=, n=12, features = features)
-    Display_Latent_States(N = 12)
-    Calculate_TransM_From_States(N=12)  
+    Get_Latent_States(id=1, n=12, features = features)
+    print('Get_Latent_States Completed')
+    
+    #Display_Latent_States(N = 12)
+    #print('Display_Latent_States Completed')
+    
+    Display_Latent_States_Along_Time(N=12)
+    print('Display_Latent_States_Along_Time Completed')
+    
+    #Calculate_TransM_From_States(N=12)  
+    #print('Calculate_TransM_From_States Completed')
     
     Get_States_Characterized(pellet_delivery = True,
                                 state_before_visit = True,
                                 start_visit = True,
                                 end_visit = True,
                                 N=12)
+    print('Get_States_Characterized Completed')
 
 
 if __name__ == "__main__":

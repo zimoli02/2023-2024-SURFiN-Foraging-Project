@@ -210,8 +210,8 @@ def Calculate_Along_Time():
         axs[1,1].plot(N, Variance_A)
         axs[2,1].plot(N, Skewness_A)
         axs[3,1].plot(N, Kurtosis_A)
-        axs[3,0].set_ylabel('Speed')
-        axs[3,1].set_ylabel('Acceleration')
+        axs[3,0].set_xlabel('Speed')
+        axs[3,1].set_xlabel('Acceleration')
         for i in range(4):
             for j in range(2):
                 axs[i,j].set_xticks(N[::2], Hour[::2])

@@ -49,12 +49,27 @@ STARTS = [
     [pd.Timestamp('2024-02-28 13:54:17.00'), pd.Timestamp('2024-03-01 16:46:17.520991801')]
 ]
 
+def inverse_sigmoid(y, midpoint, scale):
+    y = Normalization(y)
+    x = - scale * np.log(1 / y - 1) + midpoint
+    return x
+
+def Normalization(x):
+    if min(x) <= 0 or max(x) >= 1:
+        min_val = np.min(x) - 1e-8
+        max_val = np.max(x) + 1e-8
+        x = (x - min_val) / (max_val - min_val)
+    return x
+
+def sigmoid(x, midpoint, scale):
+    return 1 / (1 + np.exp(-(x - midpoint) / scale))
 
 def ConcatenateSessions():
     dfs = []
     for i in range(len(LABELS)):
         type, mouse = LABELS[i][0], LABELS[i][1]
         Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
+        #Visits = Visits[Visits['duration'] <= 300]
         dfs.append(Visits)
         
     VISIT = pd.concat(dfs, ignore_index=True)
@@ -102,7 +117,6 @@ def Process_Visits():
         VISITS = VISITS.sort_values(by='start',ignore_index=True) 
         VISITS.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
 
-
 def Variables(VISIT, feature, predictor = 'distance'):
     X = VISIT[feature]
     scaler = StandardScaler()
@@ -135,12 +149,11 @@ def FitModel(X, Y, type):
     if type == 'Gamma': model = sm.GLM(Y, X, family=sm.families.Gamma(sm.families.links.Log()))
     return model
 
-def CrossValidation(X, Y, type, split_perc = 0.75):
+def CrossValidation(X, Y, type, midpoint, scale, split_perc = 0.75):    
     split_size = int(len(Y) * split_perc)
     indices = np.arange(len(Y))
     
-    MSE_min = 1e20
-    
+    corre_max = -1
     for i in range(100):
         np.random.shuffle(indices)
         
@@ -154,25 +167,29 @@ def CrossValidation(X, Y, type, split_perc = 0.75):
         result = model.fit()
         Y_test_pred = result.predict(X_test)
         
-        mse = np.mean((Y_test_pred.to_numpy() - Y_test.to_numpy()) ** 2)
-        if mse < MSE_min:  
+        Y_test_pred = inverse_sigmoid(Y_test_pred.to_numpy(), midpoint=midpoint, scale=scale)
+        Y_test = inverse_sigmoid(Y_test.to_numpy().reshape(1,-1)[0], midpoint=midpoint, scale=scale)
+        
+        #mse = np.mean((Y_test_pred.to_numpy() - Y_test.to_numpy()) ** 2)
+        corre = np.corrcoef(Y_test_pred, Y_test)[0,1]
+        if corre > corre_max:  
             result_valid = result
-            MSE_min = mse
+            corre_max = corre
     
-    return result_valid, MSE_min
+    return result_valid, corre_max
         
     
-def Model(X, Y, type = 'Poisson'):
+def Model(X, Y, midpoint, scale, type = 'Poisson'):
     
-    result, average_mse = CrossValidation(X, Y, type)
+    result, corre_max = CrossValidation(X, Y, type, midpoint, scale)
     y_pred = result.predict(X)
 
-    return result, y_pred, average_mse
+    return result, y_pred, corre_max
 
 def PlotModelPrediction(obs, pred, predictor, TYPE, title):
     N = np.arange(0, len(pred), 1)
-    obs = obs.to_numpy().reshape(1,-1)[0]
-    pred = pred.to_numpy().reshape(1,-1)[0]
+    '''obs = obs.to_numpy().reshape(1,-1)[0]
+    pred = pred.to_numpy().reshape(1,-1)[0]'''
     
     fig, axs = plt.subplots(1, 1, figsize=(40, 3), sharex=True)
     axs.plot(N, obs, color = 'black')
@@ -199,8 +216,8 @@ def PlotModelPrediction(obs, pred, predictor, TYPE, title):
 
 
 def PlotModelPrediction_Residual(obs, pred, predictor, TYPE, title):
-    obs = obs.to_numpy().reshape(1,-1)[0]
-    pred = pred.to_numpy().reshape(1,-1)[0]
+    '''obs = obs.to_numpy().reshape(1,-1)[0]
+    pred = pred.to_numpy().reshape(1,-1)[0]'''
     
     fig, axs = plt.subplots(1, 1, figsize=(10, 10))
     axs.scatter(obs, pred-obs, s = 10)    
@@ -227,53 +244,58 @@ def PrintModelSummary(result, TYPE, title):
 
 
 def Fit_Models(Visits, FEATURES, MODELS, PREDICTOR, type, mouse):
-    def sigmoid(x, midpoint, scale):
-        return 1 / (1 + np.exp(-(x - midpoint) / scale))
+    
 
     X, Y = Variables(Visits, feature = FEATURES, predictor=PREDICTOR)
     
     for MODEL in MODELS:
-        corre_max = -1
-        for i in range(50, 400):
-            for j in range(20, 60):
+        '''corre_max = -1
+        for i in range(195, 205):
+            for j in range(5, 50, 5):
                 Y_ = sigmoid(Y, midpoint = i, scale = j)
-                result, y_pred, average_mse = Model(X, Y_, type = MODEL)
-                average_mse = average_mse/np.mean(Y_)
-                print("Average MSE per Prediction for " + type + "-" + mouse + " " + MODEL + " Model Fitted: ", average_mse)
-                
-                obs = Y_.to_numpy().reshape(1,-1)[0]
-                pred = y_pred.to_numpy().reshape(1,-1)[0]
-                corre = np.corrcoef(obs, pred)[0,1]
-                
+                result, y_pred, corre = Model(X, Y_, midpoint = i, scale = j, type = MODEL)
+
                 if corre > corre_max:  
                     result_valid = result
                     y_pred_valid = y_pred
                     midpoint_valid = i 
                     scale_valid = j
                     corre_max = corre
-
+            print(midpoint_valid, scale_valid, corre_max)
+        ''' 
         #y_pred =  np.exp(y_pred) - 1 
+        midpoint_valid = 5 
+        scale_valid = 100
+        Y_ = sigmoid(Y, midpoint = midpoint_valid, scale = scale_valid)
+        result_valid, y_pred_valid, corre = Model(X, Y_, midpoint = midpoint_valid, scale = scale_valid, type = MODEL)
+        
+        Y_ = inverse_sigmoid(Y_.to_numpy().reshape(1,-1)[0], midpoint=midpoint_valid, scale=scale_valid)
+        y_pred_valid = inverse_sigmoid(y_pred_valid.to_numpy().reshape(1,-1)[0], midpoint=midpoint_valid, scale=scale_valid)
         
         PlotModelPrediction(Y_, y_pred_valid, predictor=PREDICTOR, TYPE = MODEL, title = type + "-" + mouse)
         PlotModelPrediction_Residual(Y_, y_pred_valid, predictor=PREDICTOR, TYPE = MODEL, title = type + "-" + mouse)
-        PrintModelSummary(result, MODEL, title = type + "-" + mouse)
+        PrintModelSummary(result_valid, MODEL, title = type + "-" + mouse)
         print('Midpoint:', midpoint_valid)
         print('Scale:', scale_valid)
+        print('Correlation:', corre)
+        np.save('Y.npy', Y_)
+        np.save('Y_pred.npy', y_pred_valid)
 
 def main():
     #Process_Visits()
     Visits = ConcatenateSessions()
     Fit_Models(Visits, FEATURES = ['speed','acceleration','bodylength','bodyangle','nose','last_pellets_self', 'last_pellets_other','last_duration', 'last_interval','last_pellets_interval', 'entry'], MODELS = ['Gaussian'], PREDICTOR = 'duration', type = 'All', mouse = 'Mice')
     
+    
     '''for i in range(len(LABELS)):
         #if i != 0: break
         type, mouse = LABELS[i][0], LABELS[i][1]
         Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
         
-        #Visits = Visits[Visits['next_interval'] <= 3600]
+        #Visits = Visits[Visits['duration'] <= 300]
         Visits = Visits.sort_values(by='start',ignore_index=True)  
         
-        Fit_Models(Visits, FEATURES = ['speed','acceleration','bodylength','bodyangle','nose','last_pellets_self', 'last_pellets_other','last_duration', 'last_interval','last_pellets_interval', 'entry'], MODELS = ['Gaussian'], PREDICTOR = 'duration', type = type, mouse = mouse)
+        Fit_Models(Visits, FEATURES = ['speed','acceleration','bodylength','bodyangle','nose','last_pellets_self', 'last_pellets_other','last_duration', 'last_interval','last_pellets_interval', 'entry'], MODELS = ['Poisson', 'Gaussian'], PREDICTOR = 'duration', type = type, mouse = mouse)
         '''
 if __name__ == "__main__":
     main()
