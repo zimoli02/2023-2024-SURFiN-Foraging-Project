@@ -26,6 +26,12 @@ LABELS = [
     ['Post','BAA-1104047']
 ]
 
+def FixNan(mouse_pos, column):
+    mouse_pos[column] = mouse_pos[column].interpolate()
+    mouse_pos[column] = mouse_pos[column].ffill()
+    mouse_pos[column] = mouse_pos[column].bfill()
+    
+    return mouse_pos
 
 def DrawBody(data_x, data_y, axs):
     for k in range(len(nodes_name)): 
@@ -94,7 +100,6 @@ def BodyAngle(type, mouse, data_x, data_y):
     plt.savefig('../Images/Social_BodyAngle/' + type + "_" + mouse + '.png')
     plt.show()
 
-
 def Sniffing(type, mouse, data_x, data_y):
     mid_x = (data_x['right_ear'] + data_x['left_ear'])/2
     mid_y = (data_y['right_ear'] + data_y['left_ear'])/2
@@ -141,6 +146,8 @@ def Process_Pose(get_body_length, get_body_angle, get_nose_head_distance):
             except FileNotFoundError:
                 data_x, data_y = Get_Data(type, mouse)
             
+            '''data_x = FixNan(data_x, data_x.columns)
+            data_y = FixNan(data_y, data_y.columns)'''
             if get_body_length: BodyLength(type, mouse, data_x, data_y)
             if get_body_angle: BodyAngle(type, mouse, data_x, data_y)
             if get_nose_head_distance: Sniffing(type, mouse, data_x, data_y)

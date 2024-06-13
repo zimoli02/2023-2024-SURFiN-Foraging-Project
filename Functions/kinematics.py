@@ -216,7 +216,7 @@ def LDSParameters_Manual(dt):
     return sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, V0, Z, R
 
 
-def LDSParameters_Learned(y, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z, dt = 0.02):
+def LDSParameters_Learned(y, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z, dt = 0.1):
     '''   
     pos_x0, pos_y0 = y[0,0], y[1,0]
     vel_x0, vel_y0 = (y[0,1] - y[0,0])/dt, (y[1,1] - y[1,0])/dt

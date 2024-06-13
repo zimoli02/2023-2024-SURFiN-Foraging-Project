@@ -94,10 +94,12 @@ def Radius(mouse_pos, x_o = 738.7019332885742, y_o = 562.5901412251667):
     return mouse_pos
 
 def PositionInArena(mouse_pos, arena_r = 468.9626404164694):
-    distance = mouse_pos['r'].to_numpy()
-    mouse_pos['Arena'] = np.where(distance < arena_r, 1, 0)
+    mouse_pos_ = mouse_pos.copy()
+    mouse_pos_['Arena'] = 0
+    distance = mouse_pos_['r'].to_numpy()
+    mouse_pos_.loc[:, 'Arena'] = np.where(distance < arena_r, 1, 0)
     
-    return mouse_pos
+    return mouse_pos_
     
         
 def InPatch(mouse_pos, r = 30, interval = 5, patch_loc = [[554,832],[590.25, 256.75]]):
@@ -146,7 +148,7 @@ def Social_MoveWheel(start, end, patch = 'Patch1', interval_seconds = 10):
         starts.append(start+ pd.Timedelta('1S'))
         ends.append(end_)
         start = end_ + pd.Timedelta('2S')
-    
+
     encoders = []
     if patch == 'Patch1': 
         for i in range(len(starts)):
@@ -247,16 +249,17 @@ def Social_Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10, arena_r 
         
     entry = EnterArena(mouse_pos, arena_r)
         
-    Visits = {'start':[],'end':[], 'distance':[], 'duration':[], 'speed':[], 'acceleration':[], 'bodylength':[], 'bodyangle':[], 'nose' : [],'entry':[], 'patch':[], 'pellet':[]}
+    Visits = {'start':[],'end':[], 'duration':[], 'speed':[], 'acceleration':[], 'bodylength':[], 'bodyangle':[], 'nose' : [],'entry':[], 'patch':[], 'pellet':[]}
     
     groups = encoder['Move'].ne(encoder['Move'].shift()).cumsum()
     visits = encoder[encoder['Move'] == 1].groupby(groups)['Move']
     for name, group in visits:
-        start, end = group.index[0], group.index[-1]
+        start, end = group.index[0], group.index[-1] - pd.Timedelta('10S')
+        if (end-start).total_seconds() < 0: continue
         Visits['start'].append(start)
         Visits['end'].append(end)
         Visits['duration'].append((end-start).total_seconds())
-        Visits['distance'].append(encoder.loc[start, 'Distance']-encoder.loc[end, 'Distance'])
+        #Visits['distance'].append(encoder.loc[start, 'Distance']-encoder.loc[end, 'Distance'])
             
         pre_end = start
         pre_start = pre_end - pd.Timedelta(seconds = pre_period_seconds)
@@ -298,7 +301,8 @@ def Social_Visits(mouse_pos, patch = 'Patch1', pre_period_seconds = 10, arena_r 
 def VisitIntervals(Patches = []):
     Visits = pd.concat(Patches, ignore_index=True)
     
-    Visits = Visits[abs(Visits['distance']) >= 1]
+    #Visits = Visits[abs(Visits['distance']) >= 1]
+    Visits = Visits[Visits['duration'] >= 5]
     Visits = Visits.sort_values(by='start',ignore_index=True)  
     
     Visits['last_pellets_self'] = 0
@@ -334,7 +338,7 @@ def VisitIntervals(Patches = []):
             Visits.loc[i, 'last_pellets_interval'] = Visits.loc[i, 'last_interval'] + Visits.loc[i-1, 'last_pellets_interval'] + Visits.loc[i-1, 'duration']
     
     Visits = Visits.dropna(subset=['speed'])
-    Visits['distance'] = abs(Visits['distance'])
+    #Visits['distance'] = abs(Visits['distance'])
     Visits = Visits[Visits['last_interval'] >= 0]
     Visits = Visits[Visits['next_interval'] >= 0]
         

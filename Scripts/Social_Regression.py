@@ -81,7 +81,6 @@ def Process_Visits():
     pre_period_seconds = 10
     arena_r = 511
     for i in range(len(LABELS)):
-        print(i)
         type, mouse = LABELS[i][0], LABELS[i][1]
         mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
         
@@ -116,6 +115,7 @@ def Process_Visits():
         VISITS = pd.concat(VISITS, ignore_index=True)
         VISITS = VISITS.sort_values(by='start',ignore_index=True) 
         VISITS.to_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
+        print('Visits for ' + type + '-' + mouse + " Completed")
 
 def Variables(VISIT, feature, predictor = 'distance'):
     X = VISIT[feature]
@@ -282,12 +282,16 @@ def Fit_Models(Visits, FEATURES, MODELS, PREDICTOR, type, mouse):
         np.save('Y_pred.npy', y_pred_valid)
 
 def main():
-    #Process_Visits()
+    '''Process_Visits()
+    print('Process Visits Completed')
+    
     Visits = ConcatenateSessions()
+    print('Concatenate Sessions Completed')
+    
     Fit_Models(Visits, FEATURES = ['speed','acceleration','bodylength','bodyangle','nose','last_pellets_self', 'last_pellets_other','last_duration', 'last_interval','last_pellets_interval', 'entry'], MODELS = ['Gaussian'], PREDICTOR = 'duration', type = 'All', mouse = 'Mice')
+    print('Fit Models for Concatenate Sessions Completed')'''
     
-    
-    '''for i in range(len(LABELS)):
+    for i in range(len(LABELS)):
         #if i != 0: break
         type, mouse = LABELS[i][0], LABELS[i][1]
         Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
@@ -296,6 +300,6 @@ def main():
         Visits = Visits.sort_values(by='start',ignore_index=True)  
         
         Fit_Models(Visits, FEATURES = ['speed','acceleration','bodylength','bodyangle','nose','last_pellets_self', 'last_pellets_other','last_duration', 'last_interval','last_pellets_interval', 'entry'], MODELS = ['Poisson', 'Gaussian'], PREDICTOR = 'duration', type = type, mouse = mouse)
-        '''
+        print('Fit Models for ' + type + '-' + mouse + " Completed")
 if __name__ == "__main__":
     main()
