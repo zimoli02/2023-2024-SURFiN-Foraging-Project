@@ -35,24 +35,24 @@ LABELS = [
 nodes_name = ['nose', 'head', 'right_ear', 'left_ear', 'spine1', 'spine2','spine3', 'spine4']
 color_names = ['black', "blue", "red", "tan", "green", "brown", "purple", "orange", 'turquoise', "yellow", 'pink', 'darkblue']
 
-def Display_Body_Info(Mouse, Bodylength = True, Bodyangle = True, Nose = True):
-    Mouse_title = Mouse.type + '_' + Mouse.mouse
-    times = Mouse.mouse_pos.index
-    bodylength = Mouse.body_info.bodylength
-    bodyangle = Mouse.body_info.bodyangle
-    nose = Mouse.body_info.nose
-    
-    data_x = Mouse.body_data_x
-    data_y = Mouse.body_data_y
-    
-    def Get_Pose_Frame(pattern, value_str, time):
+def Display_Body_Info(Mouse, property, nodes):
+    def n_Cluster(variable):
+        n_cluster = {
+            'spine1-spine3': 3, 
+            'head-spine3': 4, 
+            'right_ear-spine3': 5,
+            'left_ear-spine3': 5
+        }
+        return n_cluster[variable]
+
+    def Get_Pose_Frame(variable, value_str, time):
         start, end = time, time + pd.Timedelta("0.2S")
         root = Mouse.root
         video_metadata = aeon.load(root, social02.CameraTop.Video, start=start, end=end)
-        video_metadata.index = video_metadata.index.round("20L")  # round timestamps to nearest 20 ms
-        frames = video.frames(video_metadata)  # get actual frames based on vid metadata
+        video_metadata.index = video_metadata.index.round("20L")
+        frames = video.frames(video_metadata)
         first_frame = next(frames)
-        cv2.imwrite("../Images/Social_" + pattern + '/' + Mouse_title + '_' + value_str + '.jpg', first_frame)
+        cv2.imwrite("../Images/Social_BodyInfo/" + variable + '/frames/' + Mouse_title + '_' + value_str + '.jpg', first_frame)
 
     
     def DrawBody(data_x, data_y, axs):
@@ -72,52 +72,41 @@ def Display_Body_Info(Mouse, Bodylength = True, Bodyangle = True, Nose = True):
         axs.set_ylim(y_min-20, y_min+50)
         return axs
 
-    def DrawPoses(pattern, center, d, axs):
+    def DrawPoses(variable, center, d, axs):
         for j in range(len(center)):
             for i in range(len(data_x)):
                 if abs(d[i] - center[j]) < 0.1: 
                     if np.any(np.isnan(np.array(data_x.iloc[i]))): continue
                     axs[j] = DrawBody(data_x.iloc[i],data_y.iloc[i], axs[j])
                     axs[j].set_title(str(round(center[j],2)))
-                    Get_Pose_Frame(pattern, str(round(center[j],2)), time = times[i])
+                    Get_Pose_Frame(variable, str(round(center[j],2)), time = times[i])
                     break
         return axs
 
-    def BodyLength():
-        data = np.array(bodylength.dropna()).reshape(-1, 1)
-        kmeans = KMeans(n_clusters=5, random_state=0)
-        kmeans.fit(data)
-        
+    def DrawDistance(variable):
+        data = mouse_pos[variable].to_numpy()
+        kmeans = KMeans(n_clusters=n_Cluster(variable), random_state=0, n_init = 'auto')
+        kmeans.fit_predict(data.reshape(-1, 1))
         center = np.sort(kmeans.cluster_centers_.T[0])
+        
         fig, axs = plt.subplots(1,len(center), figsize = (len(center)*5,4))
-        axs = DrawPoses('BodyLength',center, bodylength, axs)
-        plt.savefig('../Images/Social_BodyLength/' + Mouse_title + '.png')
+        axs = DrawPoses(variable,center, data, axs)
+        plt.savefig('../Images/Social_BodyInfo/'+ variable + '/' + Mouse_title + '.png')
         plt.show()
 
-    def BodyAngle():
-        data = bodyangle[~np.isnan(bodyangle)].reshape(-1,1)
-        kmeans = KMeans(n_clusters=5, random_state=0)
-        kmeans.fit(data)
+    Mouse_title = Mouse.type + '_' + Mouse.mouse
+    times = Mouse.mouse_pos.index
+    mouse_pos = Mouse.mouse_pos
+    
+    variable = nodes[0]
+    for i in range(1, len(nodes)): variable = variable + '-' + nodes[i]
+    
+    data_x = Mouse.body_data_x
+    data_y = Mouse.body_data_y
+    
+    DrawDistance(variable)
 
-        center = np.sort(kmeans.cluster_centers_.T[0])
-        fig, axs = plt.subplots(1,len(center), figsize = (len(center)*5,4))
-        axs = DrawPoses('BodyAngle',center, bodyangle, axs)
-        plt.savefig('../Images/Social_BodyAngle/' + Mouse_title + '.png')
-
-    def NoseActivity():
-        data = np.array(nose.dropna()).reshape(-1, 1)
-        kmeans = KMeans(n_clusters=3, random_state=0)
-        kmeans.fit(data)
-        
-        center = np.sort(kmeans.cluster_centers_.T[0])
-        fig, axs = plt.subplots(1,len(center), figsize = (len(center)*5,4))
-        axs = DrawPoses('Nose', center, nose, axs)
-        plt.savefig('../Images/Social_Nose/' + Mouse_title + '.png')
-
-    if Bodylength: BodyLength()
-    if Bodyangle: BodyAngle()
-    if Nose: NoseActivity()
-    print('Display_Body_Info Completed')
+    print('Display_Body_Info for variable ' + variable + ' Completed')
     
 def Display_Body_Info_Comparison(Mice, Bodylength = True, Bodyangle = True, Nose = True):
     def Compare_Pose_between_Animals(pattern, data, cluster = 5):
@@ -329,6 +318,53 @@ def Display_HMM_STates_Along_Time(mouse_pos, states, start, end, title):
     
     print('Display_HMM_STates_Along_Time Completed')
 
+def Display_HMM_States_Feature(Mouse, title):
+    def CollectData_Single(mouse_pos, N):
+        x, y, speed, acce, r, spine1_spine3, head_spine3, right_ear_spine3, left_ear_spine3 = [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)]
+        for i in range(N):
+            x[i] =  mouse_pos['smoothed_position_x'][states==i]
+            y[i] = mouse_pos['smoothed_position_y'][states==i]
+            speed[i] = mouse_pos['smoothed_speed'][states==i]
+            acce[i] = mouse_pos['smoothed_acceleration'][states == i]
+            r[i] = mouse_pos['r'][states == i]
+            spine1_spine3[i] = mouse_pos['spine1-spine3'][states == i]
+            head_spine3[i] = mouse_pos['head-spine3'][states == i]
+            right_ear_spine3[i] = mouse_pos['right_ear-spine3'][states == i]
+            left_ear_spine3[i] = mouse_pos['left_ear-spine3'][states == i]
+        return x, y, speed, acce, r, spine1_spine3, head_spine3, right_ear_spine3, left_ear_spine3
+
+    def PlotPosition(N, x, y, title):
+        fig, axs = plt.subplots(1, N, figsize = (N*8-2,6))
+        for i in range(N):
+            axs[i].scatter(x[i], y[i], color = color_names[i], s = 2, alpha = 0.2)
+            axs[i].set_xlim((100,1400))
+            axs[i].set_ylim((-20,1100))
+            axs[i].set_title('State' + str(i))
+            axs[i].set_xlabel('X')
+            axs[i].set_ylabel('Y')
+        plt.savefig(title)
+    
+    def PlotFeatures(N, DATA, FEATURE, title):
+        fig, axs = plt.subplots(len(FEATURE), 1, figsize = (10, len(FEATURE)*7-1))
+        for data, i in zip(DATA, range(len(DATA))):
+            means = [np.mean(arr) for arr in data]
+            var = [np.std(arr)/np.sqrt(len(arr)) for arr in data]
+            axs[i].bar(range(N), means, yerr=var, capsize=5)
+            axs[i].set_xticks(range(0, N), [str(j) for j in range(N)])
+            axs[i].set_ylabel(FEATURE[i])
+        plt.savefig(title)
+    
+    Mouse_title = Mouse.type + '_' + Mouse.mouse
+    mouse_pos = Mouse.mouse_pos
+    states = Mouse.hmm.states
+    N = Mouse.hmm.n_state
+    mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
+
+    x, y, speed, acce, r, spine1_spine3, head_spine3, right_ear_spine3, left_ear_spine3 = CollectData_Single(mouse_pos, N)
+    PlotPosition(N, x, y, title = '../Images/Social_HMM/Position/' + Mouse_title + '.png')
+    PlotFeatures(N, DATA = [speed, acce, r, spine1_spine3, head_spine3, right_ear_spine3, left_ear_spine3], FEATURE = ['SPEED', 'ACCE', 'R', 'Spine1-3', 'Head-Spine3', 'RightE-Spine3', 'LeftE-Spine3'], title = '../Images/Social_HMM/Feature/' + Mouse_title + '.png')
+    print('Display_HMM_States_Feature Completed')
+
 def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, state_before_visit = True, start_visit = True, end_visit = True, enter_arena = True):
 
     Mouse_title = Mouse.type + '_' + Mouse.mouse
@@ -376,7 +412,7 @@ def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, state_be
         axs.set_ylabel("Visits")
         axs.set_yticks([])
 
-        plt.savefig('../Images/Social_HMM/EnterVisit_' + Mouse_title + '.png')
+        plt.savefig('../Images/Social_HMM/EnterVisit/' + Mouse_title + '.png')
         
 
         AVE_STATES = []
@@ -403,7 +439,7 @@ def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, state_be
         axs.set_yticklabels(np.arange(N-1,-1,-1))
         axs.set_xlim(0, AVE_STATES.shape[1])
         axs.set_ylim(0, AVE_STATES.shape[0])
-        plt.savefig('../Images/Social_HMM/EnterVisit_EachState_' + Mouse_title + '.png')
+        plt.savefig('../Images/Social_HMM/EnterVisit_EachState/' + Mouse_title + '.png')
 
     def EndVisit(N):            
         STATES, DURATION = [],[]
@@ -437,7 +473,7 @@ def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, state_be
         axs.set_ylabel("Visits")
         axs.set_yticks([])
 
-        plt.savefig('../Images/Social_HMM/EndVisit_' + Mouse_title + '.png')
+        plt.savefig('../Images/Social_HMM/EndVisit/' + Mouse_title + '.png')
 
         
         AVE_STATES = []
@@ -467,7 +503,7 @@ def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, state_be
         axs.set_yticklabels(np.arange(N-1,-1,-1))
         axs.set_xlim(0, AVE_STATES.shape[1])
         axs.set_ylim(0, AVE_STATES.shape[0])
-        plt.savefig('../Images/Social_HMM/EndVisit_EachState_' + Mouse_title + '.png')
+        plt.savefig('../Images/Social_HMM/EndVisit_EachState/' + Mouse_title + '.png')
 
     def StateBeforeVisit(N):
         STATE, DURATION = [],[]
@@ -491,7 +527,7 @@ def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, state_be
         axs.set_xlabel('State')
         axs.set_ylabel("Visit Duration")
         axs.set_yticks([])
-        plt.savefig('../Images/Social_HMM/StateBeforeVisit_' + Mouse_title + '.png')
+        plt.savefig('../Images/Social_HMM/StateBeforeVisit/' + Mouse_title + '.png')
 
     def PelletDeliveries(N, t = 6):
         Pellets_State = []
@@ -517,7 +553,7 @@ def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, state_be
         axs.set_xticklabels(['Pellet'], rotation = 0)
         axs.set_ylabel("Pellet Deliveries")
         axs.set_yticks([])
-        plt.savefig('../Images/Social_HMM/PelletDelivery_' + Mouse_title + '.png')
+        plt.savefig('../Images/Social_HMM/PelletDelivery/' + Mouse_title + '.png')
 
     def EnterArena():
         STATES_day, STATES_night = [],  []
@@ -548,7 +584,7 @@ def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, state_be
         axs.set_ylabel("Visits")
         axs.set_yticks([])
 
-        plt.savefig('../Images/Social_HMM/EnterArena_' + Mouse_title + '.png')
+        plt.savefig('../Images/Social_HMM/EnterArena/' + Mouse_title + '.png')
 
         
         AVE_STATES = []
@@ -577,7 +613,7 @@ def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, state_be
         axs.set_yticklabels(np.arange(N-1,-1,-1))
         axs.set_xlim(0, AVE_STATES.shape[1])
         axs.set_ylim(0, AVE_STATES.shape[0])
-        plt.savefig('../Images/Social_HMM/EnterArena_EachState_' + Mouse_title + '.png')
+        plt.savefig('../Images/Social_HMM/EnterArena_EachState/' + Mouse_title + '.png')
     
     if pellet_delivery: PelletDeliveries(N)
     if state_before_visit: StateBeforeVisit(N)
@@ -592,8 +628,10 @@ def main():
         Mouse = mouse.Mouse(aeon_exp='AEON3', type = type_name, mouse = mouse_name)
         
         '''-------------------------------BODY-------------------------------'''
-        Mouse.body_info.Run()
-        Display_Body_Info(Mouse, Bodylength = True, Bodyangle = True, Nose = True)
+        NODES = [['head', 'spine3'],['spine1', 'spine3'],['left_ear', 'spine3'],['right_ear', 'spine3']]
+        for nodes in NODES:
+            Mouse.Add_Body_Info_to_mouse_pos(property = 'distance', nodes = nodes)
+            #Display_Body_Info(Mouse, property = 'distance', nodes = nodes)
         '''
         Display_Body_Info_Comparison(Mice = [Mouse], Bodylength = True, Bodyangle = True, Nose = True)
         '''
@@ -606,25 +644,23 @@ def main():
         '''
         
         '''-------------------------------HMM-------------------------------'''
-        '''
-        Mouse.hmm.Get_TransM()
-        Display_LDS_Trace(Mouse.hmm.TransM, title = '../Images/Social_HMM/TransM_' + Mouse.type + '_' + Mouse.mouse + '.png')
-        
-        Mouse.hmm.Get_States()
-        Display_HMM_STates_Along_Time(Mouse.mouse_pos, Mouse.hmm.states, Mouse.active_chunk[0], Mouse.active_chunk[1], title = '../Images/Social_HMM/EachState/' + Mouse.type + '_' + Mouse.mouse + '.png') 
-        
+        #Mouse.hmm.Fit_Model(n_state = 12, feature = 'Kinematics_and_Body')
         Mouse.hmm.n_state = 12
         Mouse.hmm.feature = 'Kinematics_and_Body'
-        Mouse.hmm.Get_Features()
+        Mouse.hmm.Get_TransM(n_state = 12, feature = 'Kinematics_and_Body')
+        Display_HMM_TransM(Mouse.hmm.TransM, title = '../Images/Social_HMM/TransM/' + Mouse.type + '_' + Mouse.mouse + '.png')
+        
         Mouse.hmm.Get_States()
-        Mouse.arena.Get_Pellets()
-        Mouse.arena.Get_Visits()
+        Display_HMM_STates_Along_Time(Mouse.mouse_pos, Mouse.hmm.states, Mouse.active_chunk[0], Mouse.active_chunk[1], title = '../Images/Social_HMM/State/' + Mouse.type + '_' + Mouse.mouse + '.png') 
+        
+        Mouse.Run_Visits()
+        Display_HMM_States_Feature(Mouse, title = '../Images/Social_HMM/Feature/' + Mouse.type + '_' + Mouse.mouse + '.png')
         Display_HMM_States_Characterization(Mouse, 
-                                            pellet_delivery = False,
+                                            pellet_delivery = True,
                                             state_before_visit = False,
-                                            start_visit = False,
-                                            end_visit = False,
-                                            enter_arena = True)'''
+                                            start_visit = True,
+                                            end_visit = True,
+                                            enter_arena = True)
 
 if __name__ == "__main__":
         main()

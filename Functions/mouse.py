@@ -43,29 +43,38 @@ class HMM:
         self.loglikelihood = None
         
     def Get_Features(self):
-        if self.feature == 'Kinematics': self.features = ['smoothed_speed', 'smoothed_acceleration', 'r']
-        if self.feature == 'Body': self.features = ['bodylength', 'bodyangle', 'nose']
-        if self.feature == 'Kinematics_and_Body': self.features = ['smoothed_speed', 'smoothed_acceleration', 'r', 'bodylength', 'bodyangle', 'nose']
+        if self.feature == 'Kinematics': self.features = ['smoothed_speed', 'smoothed_acceleration']
+        if self.feature == 'Body': self.features = ['spine1-spine3','head-spine3', 'right_ear-spine3', 'left_ear-spine3']
+        if self.feature == 'Kinematics_and_Body': self.features = ['smoothed_speed', 'smoothed_acceleration', 'spine1-spine3','head-spine3', 'right_ear-spine3', 'left_ear-spine3']
     
-    def Fit_Model(self):
+    def Fit_Model(self, n_state, feature):
+        self.n_state = n_state
+        self.feature = feature
         self.Get_Features()
-        fitting_input = self.mouse.mouse_pos[self.model_period[0]:self.model_period[1]][self.features]
+        
+        fitting_input = np.array(self.mouse.mouse_pos[self.model_period[0]:self.model_period[1]][self.features])
         self.model = ssm.HMM(self.n_state, len(fitting_input[0]), observations="gaussian")
+        lls = self.model.fit(fitting_input, method="em", num_iters=50, init_method="kmeans")
         self.parameters = self.model.observations.params[0].T
+        
         state_mean_speed = self.parameters[0]
         index = np.argsort(state_mean_speed, -1) 
         self.TransM = self.model.transitions.transition_matrix[index].T[index].T
-        np.save('../SocialData/HMMStates/' + self.mouse.type + "_" + self.mouse.mouse + 'TransM.npy', self.TransM)
+        np.save('../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + '.npy', self.TransM)
     
-    def Fit_Model_without_Saving(self):
+    def Fit_Model_without_Saving(self, n_state, feature):
+        self.n_state = n_state
+        self.feature = feature
         self.Get_Features()
-        fitting_input = self.mouse.mouse_pos[self.model_period[0]:self.model_period[1]][self.features]
-        obs = self.mouse.mouse_pos[self.features]
+        fitting_input = np.array(self.mouse.mouse_pos[self.model_period[0]:self.model_period[1]][self.features])
+        obs = np.array(self.mouse.mouse_pos[self.model_period[0] + pd.Timedelta('1D'):self.model_period[1]+pd.Timedelta('1D')][self.features])
         
         self.model = ssm.HMM(self.n_state, len(fitting_input[0]), observations="gaussian")
+        self.loglikelihood = self.model.fit(obs, method="em", num_iters=50, init_method="kmeans")
         self.parameters = self.model.observations.params[0].T
+        
         self.states = self.model.most_likely_states(obs)
-        self.loglikelihood = self.model.fit(obs, method="em", num_iters=self.n_state, init_method="kmeans")
+        self.loglikelihood = self.model.log_likelihood(obs)
         
         state_mean_speed = self.parameters[0]
         index = np.argsort(state_mean_speed, -1) 
@@ -74,20 +83,19 @@ class HMM:
         self.states = new_values
         self.TransM = self.model.transitions.transition_matrix[index].T[index].T
     
-    def Get_TransM(self):
+    def Get_TransM(self, n_state, feature):
         try:
-            self.TransM = np.load('../SocialData/HMMStates/' + self.mouse.type + "_" + self.mouse.mouse + "TransM.npy", allow_pickle=True)
+            self.TransM = np.load('../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
         except FileNotFoundError:
-            self.Fit_Model()
+            self.Fit_Model(n_state, feature)
     
     def Get_States(self):
         try:
-            self.states = np.load('../SocialData/HMMStates/' + self.mouse.type + "_" + self.mouse.mouse + "_States.npy", allow_pickle=True)
+            self.states = np.load('../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
         except FileNotFoundError:
-            if self.model == None: self.Fit_Model()
-            obs = self.mouse.mouse_pos[self.features]
+            obs = np.array(self.mouse.mouse_pos[self.features])
+            #self.loglikelihood = self.model.fit(obs, method="em", num_iters=50, init_method="kmeans")
             self.states = self.model.most_likely_states(obs)
-            self.loglikelihood = self.model.fit(obs, method="em", num_iters=self.n_state, init_method="kmeans")
 
             state_mean_speed = self.parameters[0]
             index = np.argsort(state_mean_speed, -1)     
@@ -95,7 +103,7 @@ class HMM:
             new_values = np.empty_like(self.states)
             for i, val in enumerate(index): new_values[self.states == val] = i
             self.states = new_values
-            np.save('../SocialData/HMMStates/' + self.mouse.type + "_" + self.mouse.mouse + "_States.npy", self.states)
+            np.save('../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", self.states)
             
 class Arena:
     def __init__(self, mouse, origin = [709.4869937896729, 546.518087387085], radius = 511):
@@ -152,6 +160,7 @@ class Arena:
             PELLET = PELLET.sort_index()
             PELLET.to_parquet('../SocialData/Pellets/'+ self.mouse.type + "_" + self.mouse.mouse +'_PELLET.parquet', engine='pyarrow')
         self.pellets = PELLET
+        print('Get_Pellets Completed')
     
     def Move_Wheel(self, start, end, patch):
         interval_seconds = self.move_wheel_interval_seconds
@@ -313,6 +322,7 @@ class Arena:
             Visits = Visits.sort_values(by='start',ignore_index=True) 
             Visits.to_parquet('../SocialData/VisitData/'  + self.mouse.type + "_" + self.mouse.mouse +'_Visit.parquet', engine='pyarrow')
         self.visits = Visits
+        print('Get_Visits Completed')
         
 class Kinematics:
     def __init__(self, session):
@@ -499,36 +509,36 @@ class Kinematics:
 class Body_Info:
     def __init__(self, mouse):
         self.mouse = mouse
-        self.bodylength = None
-        self.bodyangle = None
-        self.nose = None
-    def Process_Body_Length(self): 
-        dx = self.mouse.body_data_x['spine4'] - self.mouse.body_data_x['head']
-        dy = self.mouse.body_data_y['spine4'] - self.mouse.body_data_y['head']
-        self.bodylength = np.sqrt(dx**2 + dy**2)
-    def Process_Body_Angle(self): 
-        head = np.array([self.mouse.body_data_x['head'], self.mouse.body_data_y['head']]).T
-        spine2 = np.array([self.mouse.body_data_x['spine2'], self.mouse.body_data_y['spine2']]).T
-        spine4 = np.array([self.mouse.body_data_x['spine4'], self.mouse.body_data_y['spine4']]).T
-        v1 = head - spine2
-        v2 = spine4 - spine2
+        self.FixOutrangeData()
+        self.cluster = {}
+        
+    def FixOutrangeData(self):
+        timeindex = self.mouse.body_data_x.index
+        for name in nodes_name:
+            indices_x = np.where(abs(np.diff(self.mouse.body_data_x[name].to_numpy()) > 223))[0][1::2]
+            indices_y = np.where(abs(np.diff(self.mouse.body_data_y[name].to_numpy()) > 170))[0][1::2]
+            indices = np.unique(np.concatenate((indices_x, indices_y)))
+            self.mouse.body_data_x.loc[timeindex[indices], name] = np.nan
+            self.mouse.body_data_x.loc[timeindex[indices], name] = np.nan
+    def Process_Body_Node_Distance(self, node1, node2): 
+        dx = self.mouse.body_data_x[node1] - self.mouse.body_data_x[node2]
+        dy = self.mouse.body_data_y[node1] - self.mouse.body_data_y[node2]
+        distance = np.sqrt(dx**2 + dy**2)
+        return distance
+    def Process_Body_Node_Angle(self, node1, node0, node2): 
+        position1 = np.array([self.mouse.body_data_x[node1], self.mouse.body_data_y[node1]]).T
+        position0 = np.array([self.mouse.body_data_x[node0], self.mouse.body_data_y[node0]]).T
+        position2 = np.array([self.mouse.body_data_x[node2], self.mouse.body_data_y[node2]]).T
+        v1 = position1 - position0
+        v2 = position2 - position0
         dot_product = np.einsum('ij,ij->i', v1, v2)
         norm1 = np.linalg.norm(v1, axis=1)
         norm2 = np.linalg.norm(v2, axis=1)
         cos_theta = dot_product / (norm1 * norm2)
         cos_theta = np.clip(cos_theta, -1.0, 1.0)
         radians_theta = np.arccos(cos_theta)
-        self.bodyangle = np.degrees(radians_theta)
-    def Process_Nose(self):
-        mid_x = (self.mouse.body_data_x['right_ear'] + self.mouse.body_data_x['left_ear'])/2
-        mid_y = (self.mouse.body_data_y['right_ear'] + self.mouse.body_data_y['left_ear'])/2
-        dx = self.mouse.body_data_x['nose'] - mid_x
-        dy = self.mouse.body_data_y['nose'] - mid_y
-        self.nose = np.sqrt(dx**2 + dy**2)
-    def Run(self):
-        self.Process_Body_Length()
-        self.Process_Body_Angle()
-        self.Process_Nose()
+        return np.degrees(radians_theta)
+
 
 class Mouse:
     def __init__(self, aeon_exp, type, mouse):
@@ -546,8 +556,6 @@ class Mouse:
         self.body_info = Body_Info(self)
         self.hmm = HMM(self)
 
-        
-    
     def Get_Root(self):
         if self.aeon_exp == 'AEON3': return '/ceph/aeon/aeon/data/raw/AEON3/social0.2/'
         if self.aeon_exp == 'AEON4': return '/ceph/aeon/aeon/data/raw/AEON4/social0.2/'
@@ -608,22 +616,20 @@ class Mouse:
     
     def FixNan(self, mouse_pos, column):
         mouse_pos[column] = mouse_pos[column].interpolate()
-        mouse_pos[column] = mouse_pos[column].ffill()
         mouse_pos[column] = mouse_pos[column].bfill()
+        mouse_pos[column] = mouse_pos[column].ffill()
         return mouse_pos 
 
-    def Add_Features_to_mouse_pos(self):
-        self.Add_Body_Info_to_mouse_pos()
-        self.Add_Distance_to_mouse_pos()    
-
-    def Add_Body_Info_to_mouse_pos(self):
-        self.body_info.Run()
-        self.mouse_pos['bodylength'] = pd.Series(self.body_info.bodylength, index=self.mouse_pos.index)
-        self.mouse_pos = self.FixNan(self.mouse_pos,'bodylength')    
-        self.mouse_pos['bodyangle'] = pd.Series(self.body_info.bodyangle, index=self.mouse_pos.index)
-        self.mouse_pos = self.FixNan(self.mouse_pos,'bodyangle')    
-        self.mouse_pos['nose'] = pd.Series(self.body_info.nose, index=self.mouse_pos.index)
-        self.mouse_pos = self.FixNan(self.mouse_pos,'nose')    
+    def Add_Body_Info_to_mouse_pos(self, property, nodes):
+        variable = nodes[0]
+        for i in range(1, len(nodes)): variable = variable + '-' + nodes[i]
+            
+        if property == 'distance':
+            self.mouse_pos[variable] = pd.Series(self.body_info.Process_Body_Node_Distance(nodes[0], nodes[1]), index = self.mouse_pos.index)
+            self.mouse_pos = self.FixNan(self.mouse_pos,variable)
+        if property == 'angle':
+            self.mouse_pos[variable] = pd.Series(self.body_info.Process_Body_Node_Angle(nodes[0], nodes[1], nodes[2]), index = self.mouse_pos.index)
+            self.mouse_pos = self.FixNan(self.mouse_pos,variable)
         
     def Add_Distance_to_mouse_pos(self):
         distance = np.sqrt((self.mouse_pos['smoothed_position_x'] - self.arena.origin[0]) ** 2 + (self.mouse_pos['smoothed_position_y'] - self.arena.origin[1]) ** 2)
@@ -632,6 +638,7 @@ class Mouse:
     def Run_Visits(self):
         self.arena.Get_Pellets()
         self.arena.Get_Visits()
+        self.Add_Distance_to_mouse_pos()
 
 class Session:
     def __init__(self, aeon_exp, type, mouse, start, end):
