@@ -1,9 +1,6 @@
 import cv2
-import matplotlib.pyplot as plt
-
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from sklearn.decomposition import PCA
 from collections import Counter
 import h5py
@@ -13,31 +10,30 @@ import torch
 
 import sys
 from pathlib import Path
-
 current_script_path = Path(__file__).resolve()
+
 function_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(function_dir))
 import Functions.learning as learning
 import Functions.inference as inference
 import SSM.ssm as ssm
-#import Functions.HMM as HMM
-import Functions.kinematics as kinematics
-import Functions.patch as patch
-from SSM.ssm.plots import gradient_cmap
 
 parent_dir = current_script_path.parents[2] / 'aeon_mecha' 
 sys.path.insert(0, str(parent_dir))
 import aeon
 import aeon.io.api as api
+from aeon.io import reader, video
+from aeon.schema.dataset import exp02
 from aeon.schema.schemas import social02
+from aeon.analysis.utils import visits, distancetravelled
 
 nodes_name = ['nose', 'head', 'right_ear', 'left_ear', 'spine1', 'spine2','spine3', 'spine4']
 
 class HMM:
-    def __init__(self, mouse, n_state = None, feature = None):
+    def __init__(self, mouse):
         self.mouse = mouse
-        self.n_state = n_state
-        self.feature = feature
+        self.n_state = None
+        self.feature = None
         self.features = None
         self.model = None
         self.model_period = self.mouse.active_chunk
@@ -100,10 +96,9 @@ class HMM:
             for i, val in enumerate(index): new_values[self.states == val] = i
             self.states = new_values
             np.save('../SocialData/HMMStates/' + self.mouse.type + "_" + self.mouse.mouse + "_States.npy", self.states)
-        
-        
+            
 class Arena:
-    def __init__(self, mouse, origin = [738.7019332885742, 562.5901412251667], radius = 468.9626404164694):
+    def __init__(self, mouse, origin = [709.4869937896729, 546.518087387085], radius = 511):
         self.mouse = mouse
         self.root = self.mouse.root
         self.start = self.mouse.mouse_pos.index[0]
@@ -121,8 +116,19 @@ class Arena:
         self.visits = None
     
     def Entry(self):
+        mouse_pos_ = self.mouse.mouse_pos.copy()
         distance = np.sqrt((self.mouse.mouse_pos['smoothed_position_x'] - self.origin[0]) ** 2 + (self.mouse.mouse_pos['smoothed_position_y'] - self.origin[1]) ** 2)
-        return self.mouse.mouse_pos.iloc[np.where(distance < self.radius)].index
+        mouse_pos_['Arena'] = 0
+        mouse_pos_.loc[self.mouse.mouse_pos.iloc[np.where(distance < self.radius)].index, 'Arena'] = 1
+        InArena = mouse_pos_.Arena.to_numpy()
+        outside_arena = mouse_pos_.iloc[np.where(InArena < 1)].index
+        outside_arena_array = outside_arena.to_numpy()
+        outside_inside_indices = np.where(np.diff(outside_arena_array) > np.timedelta64(2, 's'))[0]
+        entry_raw = outside_arena[outside_inside_indices]
+        entry_raw_position_x = mouse_pos_.loc[entry_raw, 'smoothed_position_x']
+        true_entry_indices = np.where(entry_raw_position_x < (self.origin[0]-self.radius + 30), True, False)
+        entry = entry_raw[true_entry_indices]
+        return entry
     
     def Get_Pellets_per_Patch(self):
         social02.Patch1.DeliverPellet.value = 1
@@ -135,6 +141,7 @@ class Arena:
         pellets3 = aeon.load(self.root, social02.Patch3.DeliverPellet, start=self.start, end=self.end)
             
         self.pellets_per_patch = {'Patch1':pellets1, 'Patch2':pellets2, 'Patch3':pellets3}
+        
     def Get_Pellets(self):
         try:
             PELLET = pd.read_parquet('../SocialData/Pellets/'+ self.mouse.type + "_" + self.mouse.mouse +'_PELLET.parquet', engine='pyarrow')
@@ -147,7 +154,7 @@ class Arena:
         self.pellets = PELLET
     
     def Move_Wheel(self, start, end, patch):
-        interval_seconds = move_wheel_interval_seconds
+        interval_seconds = self.move_wheel_interval_seconds
         starts, ends = [],[]
         while start < end:
             if start.minute != 0:
@@ -206,7 +213,7 @@ class Arena:
         visits = []
         for i in range(len(self.mouse.starts)):
             if i == len(self.mouse.starts) - 1: mouse_pos_ = self.mouse.mouse_pos[self.mouse.starts[i]:]
-            else: mouse_pos_ = mouse_pos[self.mouse.starts[i]:self.mouse.starts[i+1]]
+            else: mouse_pos_ = self.mouse.mouse_pos[self.mouse.starts[i]:self.mouse.starts[i+1]]
             start, end = mouse_pos_.index[0], mouse_pos_.index[-1]
             encoder = self.Move_Wheel(start, end, patch = patch)
         
@@ -307,12 +314,6 @@ class Arena:
             Visits.to_parquet('../SocialData/VisitData/'  + self.mouse.type + "_" + self.mouse.mouse +'_Visit.parquet', engine='pyarrow')
         self.visits = Visits
         
-
-    
-    
-    
-    
-
 class Kinematics:
     def __init__(self, session):
         self.session = session
@@ -631,9 +632,7 @@ class Mouse:
     def Run_Visits(self):
         self.arena.Get_Pellets()
         self.arena.Get_Visits()
-        
-    
-    
+
 class Session:
     def __init__(self, aeon_exp, type, mouse, start, end):
         self.aeon_exp = aeon_exp
@@ -707,7 +706,7 @@ class Session:
         y = self.body_data_y['spine2']
         mouse_pos = pd.DataFrame({'x': x, 'y': y})
         mouse_pos['x'] = mouse_pos['x'].interpolate()
-        mouse_pos['y'] = mouse_pos['x'].interpolate()
+        mouse_pos['y'] = mouse_pos['y'].interpolate()
         return mouse_pos
     
     def Add_Kinematics(self):
@@ -734,9 +733,6 @@ class Experiment:
                         "Mouse": ["BAA-1104048", "BAA-1104048", "BAA-1104048", "BAA-1104049","BAA-1104048", "BAA-1104049"],
                         "Start": ["2024-01-31T10-14-14", "2024-02-01T20-46-44", "2024-02-01T23-40-29", "2024-02-05T14-36-00", "2024-02-25T17-24-32", "2024-02-28T13-45-06"],
                         "End": ["2024-02-01T19-00-00", "2024-02-01T22-00-00", "2024-02-03T16-00-00", "2024-02-08T14-00-00", "2024-02-28T12-00-00", "2024-03-02T15-00-00"]}
-
-
-
 
 def main():
     print('None')

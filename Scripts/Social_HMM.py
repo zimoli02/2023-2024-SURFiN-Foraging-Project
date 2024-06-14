@@ -244,6 +244,7 @@ def Display_Latent_States_Features(N):
             y[i] = mouse_pos['smoothed_position_y'][states==i]
             speed[i] = mouse_pos['smoothed_speed'][states==i]
             acce[i] = mouse_pos['smoothed_acceleration'][states == i]
+            r[i] = mouse_pos['r'][states == i]
             length[i] =mouse_pos['bodylength'][states == i]
             angle[i] = mouse_pos['bodyangle'][states == i]
         return x, y, speed, acce, r, length, angle
@@ -254,6 +255,7 @@ def Display_Latent_States_Features(N):
             Y[i] = np.concatenate([Y[i], y[i]])
             SPEED[i] = np.concatenate([SPEED[i], speed[i]])
             ACCE[i] = np.concatenate([ACCE[i], acce[i]])
+            R[i] = np.concatenate([R[i], r[i]])
             LENGTH[i] = np.concatenate([LENGTH[i], length[i]])
             ANGLE[i] = np.concatenate([ANGLE[i], angle[i]])
         return X, Y, SPEED, ACCE,R, LENGTH, ANGLE
@@ -282,7 +284,7 @@ def Display_Latent_States_Features(N):
         plt.show()
     
     X, Y, SPEED, ACCE,R, LENGTH, ANGLE = [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)]
-    for j in len(LABELS):
+    for j in range(len(LABELS)):
         type, mouse = LABELS[j][0], LABELS[j][1]
         mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
         states = np.load('../SocialData/HMMStates/' + type + "_" + mouse + "_States.npy", allow_pickle = True)
@@ -351,7 +353,6 @@ def Display_Latent_States_Along_Time(N):
                 axs[i].axvspan(START[t],END[t], color='lightblue', alpha=0.5)
         
         plt.savefig('../Images/Social_HMM/EachState/' + type + "_" +mouse+'.png')
-        plt.show()
                 
 def Calculate_TransM_From_States(N):
     for label in LABELS:
@@ -384,8 +385,8 @@ def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,s
             
             Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
             Visits = Visits.dropna(subset=['speed'])
-            Visits['distance'] = abs(Visits['distance'])
-            Visits = Visits[Visits['distance'] >= 0.1]
+            '''Visits['distance'] = abs(Visits['distance'])
+            Visits = Visits[Visits['distance'] >= 0.1]'''
             
             for i in range(len(Visits)):
                 trigger = Visits.iloc[i]['start']
@@ -421,7 +422,6 @@ def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,s
         axs.set_yticks([])
 
         plt.savefig('../Images/Social_HMM/EnterVisit.png')
-        plt.show()
         
 
         AVE_STATES = []
@@ -449,7 +449,7 @@ def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,s
         axs.set_xlim(0, AVE_STATES.shape[1])
         axs.set_ylim(0, AVE_STATES.shape[0])
         plt.savefig('../Images/Social_HMM/EnterVisit_' + 'EachState' + '.png')
-        plt.show()
+
 
     def EndVisit(n=9):    
         STATES, DURATION = [],[]
@@ -461,11 +461,12 @@ def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,s
             
             Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
             Visits = Visits.dropna(subset=['speed'])
+            '''# The above code snippet is written in Python and performs the following actions:
             Visits['distance'] = abs(Visits['distance'])
-            Visits = Visits[Visits['distance'] >= 0.1]
+            Visits = Visits[Visits['distance'] >= 0.1]'''
 
             for i in range(len(Visits)):
-                trigger = Visits.iloc[i]['end'] - pd.Timedelta('10S')
+                trigger = Visits.iloc[i]['end']
                 
                 latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('21S'):trigger, 'state'].index
                 latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
@@ -498,7 +499,7 @@ def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,s
         axs.set_yticks([])
 
         plt.savefig('../Images/Social_HMM/EndVisit.png')
-        plt.show()
+
         
         AVE_STATES = []
         for k in np.arange(n):
@@ -528,7 +529,7 @@ def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,s
         axs.set_xlim(0, AVE_STATES.shape[1])
         axs.set_ylim(0, AVE_STATES.shape[0])
         plt.savefig('../Images/Social_HMM/EndVisit_' + 'EachState' + '.png')
-        plt.show()
+
     
     def StateBeforeVisit(n=9):
         STATE, DURATION = [],[]
@@ -563,7 +564,7 @@ def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,s
         axs.set_ylabel("Visit Duration")
         axs.set_yticks([])
         plt.savefig('../Images/Social_HMM/StateBeforeVisit.png')
-        plt.show()
+
     
     def PelletDeliveries(t = 6, n=9):
     
@@ -621,7 +622,7 @@ def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,s
         axs.set_ylabel("Pellet Deliveries")
         axs.set_yticks([])
         plt.savefig('../Images/Social_HMM/PelletDelivery.png')
-        plt.show()
+
     
     if pellet_delivery: PelletDeliveries(n=N)
     if state_before_visit: StateBeforeVisit(n=N)
@@ -655,22 +656,22 @@ def main():
     
     
     '''Get_Latent_States(id=1, n=12, features = features)
-    print('Get_Latent_States Completed')'''
+    print('Get_Latent_States Completed')
     
     
     Display_Latent_States_Features(N = 12)
     print('Display_Latent_States_Features Completed')
+    '''
     
-    
-    Display_Latent_States_Along_Time(N=12)
+    '''Display_Latent_States_Along_Time(N=12)
     print('Display_Latent_States_Along_Time Completed')
     
     Calculate_TransM_From_States(N=12)  
-    print('Calculate_TransM_From_States Completed')
+    print('Calculate_TransM_From_States Completed')'''
     
-    Get_States_Characterized(pellet_delivery = True,
+    Get_States_Characterized(pellet_delivery = False,
                                 state_before_visit = False,
-                                start_visit = True,
+                                start_visit = False,
                                 end_visit = True,
                                 N=12)
     print('Get_States_Characterized Completed')

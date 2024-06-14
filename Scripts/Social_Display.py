@@ -4,26 +4,26 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import scipy.stats as stats
+from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from collections import Counter
-from pathlib import Path
+
 
 import sys
 from pathlib import Path
-
 current_script_path = Path(__file__).resolve()
+
 function_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(function_dir))
 import Functions.mouse as mouse
-import Functions.HMM as HMM
-import Functions.kinematics as kinematics
-import Functions.patch as patch
 from SSM.ssm.plots import gradient_cmap
 
 parent_dir = current_script_path.parents[2] / 'aeon_mecha' 
 sys.path.insert(0, str(parent_dir))
 import aeon
 import aeon.io.api as api
+from aeon.io import reader, video
 from aeon.schema.schemas import social02
 
 LABELS = [
@@ -35,7 +35,125 @@ LABELS = [
 nodes_name = ['nose', 'head', 'right_ear', 'left_ear', 'spine1', 'spine2','spine3', 'spine4']
 color_names = ['black', "blue", "red", "tan", "green", "brown", "purple", "orange", 'turquoise', "yellow", 'pink', 'darkblue']
 
+def Display_Body_Info(Mouse, Bodylength = True, Bodyangle = True, Nose = True):
+    Mouse_title = Mouse.type + '_' + Mouse.mouse
+    times = Mouse.mouse_pos.index
+    bodylength = Mouse.body_info.bodylength
+    bodyangle = Mouse.body_info.bodyangle
+    nose = Mouse.body_info.nose
+    
+    data_x = Mouse.body_data_x
+    data_y = Mouse.body_data_y
+    
+    def Get_Pose_Frame(pattern, value_str, time):
+        start, end = time, time + pd.Timedelta("0.2S")
+        root = Mouse.root
+        video_metadata = aeon.load(root, social02.CameraTop.Video, start=start, end=end)
+        video_metadata.index = video_metadata.index.round("20L")  # round timestamps to nearest 20 ms
+        frames = video.frames(video_metadata)  # get actual frames based on vid metadata
+        first_frame = next(frames)
+        cv2.imwrite("../Images/Social_" + pattern + '/' + Mouse_title + '_' + value_str + '.jpg', first_frame)
 
+    
+    def DrawBody(data_x, data_y, axs):
+        for k in range(len(nodes_name)): 
+            axs.scatter(data_x[nodes_name[k]], data_y[nodes_name[k]])
+        axs.plot([data_x['nose'],data_x['head']], [data_y['nose'],data_y['head']])
+        axs.plot([data_x['left_ear'],data_x['nose']], [data_y['left_ear'],data_y['nose']])
+        axs.plot([data_x['nose'],data_x['right_ear']], [data_y['nose'],data_y['right_ear']])
+        axs.plot([data_x['left_ear'],data_x['right_ear']], [data_y['left_ear'],data_y['right_ear']])
+        axs.plot([data_x['head'],data_x['spine1']], [data_y['head'],data_y['spine1']])
+        axs.plot([data_x['spine1'],data_x['spine2']], [data_y['spine1'],data_y['spine2']])
+        axs.plot([data_x['spine2'],data_x['spine3']], [data_y['spine2'],data_y['spine3']])
+        axs.plot([data_x['spine3'],data_x['spine4']], [data_y['spine3'],data_y['spine4']])
+        x_min, y_min = min(np.array(data_x)), min(np.array(data_y))
+        axs.set_aspect('equal', 'box')
+        axs.set_xlim(x_min-20, x_min+50)
+        axs.set_ylim(y_min-20, y_min+50)
+        return axs
+
+    def DrawPoses(pattern, center, d, axs):
+        for j in range(len(center)):
+            for i in range(len(data_x)):
+                if abs(d[i] - center[j]) < 0.1: 
+                    if np.any(np.isnan(np.array(data_x.iloc[i]))): continue
+                    axs[j] = DrawBody(data_x.iloc[i],data_y.iloc[i], axs[j])
+                    axs[j].set_title(str(round(center[j],2)))
+                    Get_Pose_Frame(pattern, str(round(center[j],2)), time = times[i])
+                    break
+        return axs
+
+    def BodyLength():
+        data = np.array(bodylength.dropna()).reshape(-1, 1)
+        kmeans = KMeans(n_clusters=5, random_state=0)
+        kmeans.fit(data)
+        
+        center = np.sort(kmeans.cluster_centers_.T[0])
+        fig, axs = plt.subplots(1,len(center), figsize = (len(center)*5,4))
+        axs = DrawPoses('BodyLength',center, bodylength, axs)
+        plt.savefig('../Images/Social_BodyLength/' + Mouse_title + '.png')
+        plt.show()
+
+    def BodyAngle():
+        data = bodyangle[~np.isnan(bodyangle)].reshape(-1,1)
+        kmeans = KMeans(n_clusters=5, random_state=0)
+        kmeans.fit(data)
+
+        center = np.sort(kmeans.cluster_centers_.T[0])
+        fig, axs = plt.subplots(1,len(center), figsize = (len(center)*5,4))
+        axs = DrawPoses('BodyAngle',center, bodyangle, axs)
+        plt.savefig('../Images/Social_BodyAngle/' + Mouse_title + '.png')
+
+    def NoseActivity():
+        data = np.array(nose.dropna()).reshape(-1, 1)
+        kmeans = KMeans(n_clusters=3, random_state=0)
+        kmeans.fit(data)
+        
+        center = np.sort(kmeans.cluster_centers_.T[0])
+        fig, axs = plt.subplots(1,len(center), figsize = (len(center)*5,4))
+        axs = DrawPoses('Nose', center, nose, axs)
+        plt.savefig('../Images/Social_Nose/' + Mouse_title + '.png')
+
+    if Bodylength: BodyLength()
+    if Bodyangle: BodyAngle()
+    if Nose: NoseActivity()
+    print('Display_Body_Info Completed')
+    
+def Display_Body_Info_Comparison(Mice, Bodylength = True, Bodyangle = True, Nose = True):
+    def Compare_Pose_between_Animals(pattern, data, cluster = 5):
+        N = len(Mice)
+        fig, axs = plt.subplots(N, 1, figsize = (8, N*4))
+        for i in range(N):
+            d = data[i].reshape(-1, 1)
+            kmeans = KMeans(n_clusters=cluster, random_state=0)
+            kmeans.fit(d)
+            center = np.sort(kmeans.cluster_centers_.T[0])
+            
+            axs[i].hist(data[i], bins = 100, color = 'blue')
+            for j in range(cluster):
+                axs[i].axvline(x = center[j], color = 'red', linestyle = '--')
+            axs[i].set_ylabel(LABELS[i][0] + "-" + LABELS[i][1])
+            
+            if pattern == 'BodyLength': axs[i].set_xlim((-1, 50))
+            if pattern == 'BodyAngle': axs[i].set_xlim((-1, 180))
+            if pattern == 'Nose': axs[i].set_xlim((0, 45))
+        axs[N-1].set_xlabel(pattern)
+        plt.savefig('../Images/Social_' + pattern + '/Summary.png')
+
+    
+    BodyLength, BodyAngle, NoseActivity = [], [], []
+    for Mouse in Mice:
+        bodylength = Mouse.body_info.bodylength
+        bodyangle = Mouse.body_info.bodyangle
+        nose = Mouse.body_info.nose
+        BodyLength.append(bodylength)
+        BodyAngle.append(bodyangle)
+        NoseActivity.append(nose)
+    
+    if Bodylength: Compare_Pose_between_Animals(pattern = 'BodyLength', data = BodyLength, cluster = 5)
+    if Bodyangle: Compare_Pose_between_Animals(pattern = 'BodyAngle', data = BodyAngle, cluster = 5)
+    if Nose: Compare_Pose_between_Animals(pattern = 'Nose', data = NoseActivity, cluster = 3)
+    print('Display_Body_Info_Comparison Completed')
 
 def Display_LDS_Trace(mouse_pos, title):
     fig, axs = plt.subplots(4,1, figsize = (40,24))
@@ -51,6 +169,7 @@ def Display_LDS_Trace(mouse_pos, title):
     axs[2].set_ylabel("Smoothed Vel.",fontsize = 16)
     axs[3].set_ylabel("Smoothed Acc.",fontsize = 16)
     plt.savefig(title)
+    print('Display_LDS_Trace Completed')
     
 def Display_Kinematics_Distribution_Along_Time(mouse_pos, title):
     start = mouse_pos.index[0]
@@ -86,6 +205,7 @@ def Display_Kinematics_Distribution_Along_Time(mouse_pos, title):
         axs[i,0].set_ylabel(starts[i].hour)
     
     plt.savefig(title)
+    print('Display_Kinematics_Distribution_Along_Time Completed')
     
 def Display_Kinematics_Properties_Along_Time(mouse_pos, title):   
     def Calculate_Properties(dist):
@@ -117,14 +237,14 @@ def Display_Kinematics_Properties_Along_Time(mouse_pos, title):
     for i in range(n):
         df = mouse_pos[starts[i]:ends[i]]
         speed = df.smoothed_speed
-        mean, variance, skewness, kurtosis = Calculate_Distribution(speed)
+        mean, variance, skewness, kurtosis = Calculate_Properties(speed)
         Mean_V.append(mean)
         Variance_V.append(variance)
         Skewness_V.append(skewness)
         Kurtosis_V.append(kurtosis)
         
         acce = df.smoothed_acceleration
-        mean, variance, skewness, kurtosis = Calculate_Distribution(acce)
+        mean, variance, skewness, kurtosis = Calculate_Properties(acce)
         Mean_A.append(mean)
         Variance_A.append(variance)
         Skewness_A.append(skewness)
@@ -158,13 +278,15 @@ def Display_Kinematics_Properties_Along_Time(mouse_pos, title):
             for t in range(0,len(CR),2):
                 axs[i,j].axvspan(CR[t],CR[t+1], color='lightblue', alpha=0.5)
     plt.savefig(title)
+    print('Display_Kinematics_Properties_Along_Time Completed')
     
-def Display_HMM_TransM(TransM, title)
+def Display_HMM_TransM(TransM, title):
     annot_array = np.array([[round(item, 3) for item in row] for row in TransM])
-    fig, axs = plt.subplots(1,1, figsize=(len(transition_mat)+3, len(transition_mat)+3))
+    fig, axs = plt.subplots(1,1, figsize=(len(TransM)+3, len(TransM)+3))
     sns.heatmap(TransM, cmap='binary', ax = axs, square = 'True', cbar = False, annot=annot_array)
     axs.set_title("Learned Transition Matrix") 
     plt.savefig(title)
+    print('Display_HMM_TransM Completed')
 
 def Display_HMM_STates_Along_Time(mouse_pos, states, start, end, title):
     mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
@@ -196,7 +318,7 @@ def Display_HMM_STates_Along_Time(mouse_pos, states, start, end, title):
         START.append(zero_groups[i][0])
         END.append(zero_groups[i][-1])
 
-
+    N = max(states) + 1
     fig, axs = plt.subplots(N, 1, figsize=(50, 4*N-1))
     for i in range(N):
         states_prob[i].plot(color = color_names[i], ax = axs[i])
@@ -204,45 +326,46 @@ def Display_HMM_STates_Along_Time(mouse_pos, states, start, end, title):
             axs[i].axvspan(START[t],END[t], color='lightblue', alpha=0.5)
     
     plt.savefig(title)
-
-def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,start_visit = True,end_visit = True,N=9):
     
-    def StartVisit(n=9):    
-        STATE, DURATION = [],[]
-        for label in LABELS:
-            type, mouse = label[0], label[1]
-            mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
-            states = np.load('../SocialData/HMMStates/' + type + "_" + mouse + "_States.npy", allow_pickle = True)
-            mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
+    print('Display_HMM_STates_Along_Time Completed')
+
+def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, state_before_visit = True, start_visit = True, end_visit = True, enter_arena = True):
+
+    Mouse_title = Mouse.type + '_' + Mouse.mouse
+    mouse_pos = Mouse.mouse_pos
+    states = Mouse.hmm.states
+    N = Mouse.hmm.n_state
+    Pellets = Mouse.arena.pellets
+    Visits = Mouse.arena.visits
+    Entry = Mouse.arena.entry 
+    
+    mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
+    Visits = Visits.dropna(subset=['speed'])
+    
+    colors = sns.xkcd_palette(color_names[0:N])
+    cmap = gradient_cmap(colors)
+    
+    def StartVisit(N):        
+        STATE, DURATION = [], []    
+        for i in range(len(Visits)):
+            trigger = Visits.iloc[i]['start']
             
-            Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
-            Visits = Visits.dropna(subset=['speed'])
-            Visits['distance'] = abs(Visits['distance'])
-            Visits = Visits[Visits['distance'] >= 0.1]
+            latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('21S'):trigger, 'state'].index
+            latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
+            if len(latest_valid_state) >= 200: latest_valid_state  = latest_valid_state[-200:]
             
-            for i in range(len(Visits)):
-                trigger = Visits.iloc[i]['start']
-                
-                latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('21S'):trigger, 'state'].index
-                latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
-                if len(latest_valid_state) >= 200: latest_valid_state  = latest_valid_state[-200:]
-                
-                next_valid_index = mouse_pos.loc[trigger:trigger + pd.Timedelta('6S'), 'state'].index
-                next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
-                if len(next_valid_state) >= 50: next_valid_state  = next_valid_state[:50]
-                state = np.concatenate((latest_valid_state, np.array([np.nan]), next_valid_state))
-                
-                if len(state) == 251: 
-                    STATE.append(state)
-                    DURATION.append(Visits.iloc[i]['duration'])
+            next_valid_index = mouse_pos.loc[trigger:trigger + pd.Timedelta('6S'), 'state'].index
+            next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
+            if len(next_valid_state) >= 50: next_valid_state  = next_valid_state[:50]
+            state = np.concatenate((latest_valid_state, np.array([np.nan]), next_valid_state))
+            
+            if len(state) == 251: 
+                STATE.append(state)
+                DURATION.append(Visits.iloc[i]['duration'])
 
         index = np.argsort(DURATION)
         STATE = np.array(STATE)[index]
         
-        N = n
-        colors = sns.xkcd_palette(color_names[0:N])
-        cmap = gradient_cmap(colors)
-
         fig, axs = plt.subplots(1, 1, figsize=(10, 16))
         sns.heatmap(STATE, cmap=cmap, ax=axs, vmin=0, vmax = N-1, cbar = True)
         axs.set_aspect('auto')
@@ -253,12 +376,11 @@ def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,s
         axs.set_ylabel("Visits")
         axs.set_yticks([])
 
-        plt.savefig('../Images/Social_HMM/EnterVisit.png')
-        plt.show()
+        plt.savefig('../Images/Social_HMM/EnterVisit_' + Mouse_title + '.png')
         
 
         AVE_STATES = []
-        for k in np.arange(n):
+        for k in np.arange(N):
             index = STATE == k
             states = index*1
             AVE_STATES.append(np.mean(states, axis = 0))
@@ -281,45 +403,30 @@ def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,s
         axs.set_yticklabels(np.arange(N-1,-1,-1))
         axs.set_xlim(0, AVE_STATES.shape[1])
         axs.set_ylim(0, AVE_STATES.shape[0])
-        plt.savefig('../Images/Social_HMM/EnterVisit_' + 'EachState' + '.png')
-        plt.show()
+        plt.savefig('../Images/Social_HMM/EnterVisit_EachState_' + Mouse_title + '.png')
 
-    def EndVisit(n=9):    
+    def EndVisit(N):            
         STATES, DURATION = [],[]
-        for label in LABELS:
-            type, mouse = label[0], label[1]
-            mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
-            states = np.load('../SocialData/HMMStates/' + type + "_" + mouse + "_States.npy", allow_pickle = True)
-            mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
+        for i in range(len(Visits)):
+            trigger = Visits.iloc[i]['end']
             
-            Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
-            Visits = Visits.dropna(subset=['speed'])
-            Visits['distance'] = abs(Visits['distance'])
-            Visits = Visits[Visits['distance'] >= 0.1]
-
-            for i in range(len(Visits)):
-                trigger = Visits.iloc[i]['end'] - pd.Timedelta('10S')
-                
-                latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('21S'):trigger, 'state'].index
-                latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
-                if len(latest_valid_state) >= 200: latest_valid_state  = latest_valid_state[-200:]
-                
-                next_valid_index = mouse_pos.loc[trigger:trigger + pd.Timedelta('6S'), 'state'].index
-                next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
-                if len(next_valid_state) >= 50: next_valid_state  = next_valid_state[:50]
-                
-                state = np.concatenate((latest_valid_state, np.array([np.nan]), next_valid_state))
-                
-                if len(state) == 251: 
-                    STATES.append(state)
-                    DURATION.append(Visits.iloc[i]['duration'])
+            latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('21S'):trigger, 'state'].index
+            latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
+            if len(latest_valid_state) >= 200: latest_valid_state  = latest_valid_state[-200:]
+            
+            next_valid_index = mouse_pos.loc[trigger:trigger + pd.Timedelta('6S'), 'state'].index
+            next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
+            if len(next_valid_state) >= 50: next_valid_state  = next_valid_state[:50]
+            
+            state = np.concatenate((latest_valid_state, np.array([np.nan]), next_valid_state))
+            
+            if len(state) == 251: 
+                STATES.append(state)
+                DURATION.append(Visits.iloc[i]['duration'])
 
         index = np.argsort(DURATION)
         STATES = np.array(STATES)[index]
-        N = n
-        colors = sns.xkcd_palette(color_names[0:N])
-        cmap = gradient_cmap(colors)
-        
+
         fig, axs = plt.subplots(1, 1, figsize=(10, 16))
         sns.heatmap(STATES,cmap=cmap, ax=axs, vmin=0, vmax = N-1, cbar = True)
         axs.set_aspect('auto')
@@ -330,11 +437,11 @@ def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,s
         axs.set_ylabel("Visits")
         axs.set_yticks([])
 
-        plt.savefig('../Images/Social_HMM/EndVisit.png')
-        plt.show()
+        plt.savefig('../Images/Social_HMM/EndVisit_' + Mouse_title + '.png')
+
         
         AVE_STATES = []
-        for k in np.arange(n):
+        for k in np.arange(N):
             index = STATES == k
             states = index*1
             AVE_STATES.append(np.mean(states, axis = 0))
@@ -360,92 +467,49 @@ def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,s
         axs.set_yticklabels(np.arange(N-1,-1,-1))
         axs.set_xlim(0, AVE_STATES.shape[1])
         axs.set_ylim(0, AVE_STATES.shape[0])
-        plt.savefig('../Images/Social_HMM/EndVisit_' + 'EachState' + '.png')
-        plt.show()
+        plt.savefig('../Images/Social_HMM/EndVisit_EachState_' + Mouse_title + '.png')
 
-    def StateBeforeVisit(n=9):
+    def StateBeforeVisit(N):
         STATE, DURATION = [],[]
-        for label in LABELS:
-            type, mouse = label[0], label[1]
-            mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
-            states = np.load('../SocialData/HMMStates/' + type + "_" + mouse + "_States.npy", allow_pickle = True)
-            mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
+
+        for i in range(len(Visits)):
+            trigger = Visits.iloc[i]['start']
             
-            Visits = pd.read_parquet('../SocialData/VisitData/'  + type + "_" + mouse +'_Visit.parquet', engine='pyarrow')
-            Visits = Visits.dropna(subset=['speed'])
-            Visits['distance'] = abs(Visits['distance'])
-            Visits = Visits[Visits['distance'] >= 0.1]
+            latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('11S'):trigger, 'state'].index
+            latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
+            if len(latest_valid_state) >= 100: latest_valid_state  = latest_valid_state[-100:]
             
-            for i in range(len(Visits)):
-                trigger = Visits.iloc[i]['start']
-                
-                latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('11S'):trigger, 'state'].index
-                latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
-                if len(latest_valid_state) >= 100: latest_valid_state  = latest_valid_state[-100:]
-                
-                count = Counter(latest_valid_state)
-                states_before_forage, frequency = count.most_common(1)[0]
-                
-                #if len(states_before_forage) == 0: continue
-                STATE.append(states_before_forage)
-                DURATION.append(Visits.iloc[i]['duration'])
+            count = Counter(latest_valid_state)
+            states_before_forage, frequency = count.most_common(1)[0]
+            
+            #if len(states_before_forage) == 0: continue
+            STATE.append(states_before_forage)
+            DURATION.append(Visits.iloc[i]['duration'])
             
         fig, axs = plt.subplots(1, 1, figsize=(10,6))
         axs.scatter(STATE,DURATION)
         axs.set_xlabel('State')
         axs.set_ylabel("Visit Duration")
         axs.set_yticks([])
-        plt.savefig('../Images/Social_HMM/StateBeforeVisit.png')
-        plt.show()
-    
-    def PelletDeliveries(t = 6, n=9):
-    
+        plt.savefig('../Images/Social_HMM/StateBeforeVisit_' + Mouse_title + '.png')
+
+    def PelletDeliveries(N, t = 6):
         Pellets_State = []
-        
-        for label in LABELS:
-            type, mouse = label[0], label[1]
-            mouse_pos = pd.read_parquet('../SocialData/HMMData/' + type + "_" + mouse + '.parquet', engine='pyarrow')
-            states = np.load('../SocialData/HMMStates/' + type + "_" + mouse + "_States.npy", allow_pickle = True)
-            mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
+        for i in range(len(Pellets)):
+            trigger = Pellets.index[i]
             
-            try:
-                PELLET = pd.read_parquet('../SocialData/Pellets/'+ type + "_" + mouse +'_PELLET.parquet', engine='pyarrow')
-            except FileNotFoundError:
-                start, end = mouse_pos.index[0], mouse_pos.index[-1]
-                
-                social02.Patch1.DeliverPellet.value = 1
-                pellets_patch1 = aeon.load(root, social02.Patch1.DeliverPellet, start=start, end=end)
-                
-                social02.Patch2.DeliverPellet.value = 1
-                pellets_patch2 = aeon.load(root, social02.Patch2.DeliverPellet, start=start, end=end)
-                
-                social02.Patch3.DeliverPellet.value = 1
-                pellets_patch3 = aeon.load(root, social02.Patch3.DeliverPellet, start=start, end=end)
-                
-                PELLET = pd.concat([pellets_patch1,pellets_patch2, pellets_patch3], ignore_index=False)
-                PELLET = PELLET.sort_index()
-                PELLET.to_parquet('../SocialData/Pellets/'+ type + "_" + mouse +'_PELLET.parquet', engine='pyarrow')
+            latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('6S'):trigger, 'state'].index
+            latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
+            if len(latest_valid_state) >= 50: latest_valid_state  = latest_valid_state[-50:]
+            
+            next_valid_index = mouse_pos.loc[trigger:trigger + pd.Timedelta('6S'), 'state'].index
+            next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
+            if len(next_valid_state) >= 50: next_valid_state  = next_valid_state[:50]
+            
+            state = np.concatenate((latest_valid_state, np.array([np.nan]), next_valid_state))
+            
+            if len(state) == 101: Pellets_State.append(state)
 
-
-            for i in range(len(PELLET)):
-                trigger = PELLET.index[i]
-                
-                latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('6S'):trigger, 'state'].index
-                latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
-                if len(latest_valid_state) >= 50: latest_valid_state  = latest_valid_state[-50:]
-                
-                next_valid_index = mouse_pos.loc[trigger:trigger + pd.Timedelta('6S'), 'state'].index
-                next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
-                if len(next_valid_state) >= 50: next_valid_state  = next_valid_state[:50]
-                
-                state = np.concatenate((latest_valid_state, np.array([np.nan]), next_valid_state))
-                
-                if len(state) == 101: Pellets_State.append(state)
-
-
-        N = n
-        colors = sns.xkcd_palette(color_names[0:N])
-        cmap = gradient_cmap(colors)
         fig, axs = plt.subplots(1, 1, figsize=(6, 16))
         sns.heatmap(Pellets_State,cmap=cmap, ax=axs, vmin=0, vmax = N-1, cbar = True)
         axs.set_aspect('auto')
@@ -453,40 +517,114 @@ def Get_States_Characterized(pellet_delivery = False,state_before_visit = True,s
         axs.set_xticklabels(['Pellet'], rotation = 0)
         axs.set_ylabel("Pellet Deliveries")
         axs.set_yticks([])
-        plt.savefig('../Images/Social_HMM/PelletDelivery.png')
-        plt.show()
+        plt.savefig('../Images/Social_HMM/PelletDelivery_' + Mouse_title + '.png')
+
+    def EnterArena():
+        STATES_day, STATES_night = [],  []
+        for i in range(len(Entry)):
+            trigger = Entry[i]
+            
+            latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('11S'):trigger, 'state'].index
+            latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
+            if len(latest_valid_state) >= 100: latest_valid_state  = latest_valid_state[-100:]
+            
+            next_valid_index = mouse_pos.loc[trigger:trigger + pd.Timedelta('11S'), 'state'].index
+            next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
+            if len(next_valid_state) >= 100: next_valid_state  = next_valid_state[:100]
+            
+            state = np.concatenate((latest_valid_state, np.array([np.nan]), next_valid_state))
+            
+            if len(state) == 201: 
+                if trigger.hour < 7 or trigger.hour > 19: STATES_night.append(state)
+                else: STATES_day.append(state)
+        STATES = np.vstack((np.array(STATES_day), np.array(STATES_night)))
+        fig, axs = plt.subplots(1, 1, figsize=(10, 16))
+        sns.heatmap(STATES,cmap=cmap, ax=axs, vmin=0, vmax = N-1, cbar = True)
+        axs.set_aspect('auto')
+        
+        axs.set_xticks([100])
+        axs.set_xticklabels(['Enter'], rotation = 0)
+
+        axs.set_ylabel("Visits")
+        axs.set_yticks([])
+
+        plt.savefig('../Images/Social_HMM/EnterArena_' + Mouse_title + '.png')
+
+        
+        AVE_STATES = []
+        for k in np.arange(N):
+            index = STATES == k
+            states = index*1
+            AVE_STATES.append(np.mean(states, axis = 0))
+        AVE_STATES = np.array(AVE_STATES)
+        fig, axs = plt.subplots(1, 1, figsize=(20, 4))
+        for i in range(AVE_STATES.shape[0]):
+            color = color_names[i]
+            rgba_color = plt.cm.colors.to_rgba(color)
+            for j in range(AVE_STATES.shape[1]):
+                if np.isnan(AVE_STATES[i, j]):
+                    axs.add_patch(plt.Rectangle((j, N-1-i), 0.3, 1, color=plt.cm.colors.to_rgba('black'), alpha=1, linewidth=0))
+                else:
+                    axs.add_patch(plt.Rectangle((j, N-1-i), 1, 1, color=rgba_color, alpha=AVE_STATES[i, j], linewidth=0))
+                    
+        axs.set_aspect('auto')
+        
+        axs.set_xticks([100])
+        axs.set_xticklabels(['Enter'], rotation = 0)
+
+        axs.set_ylabel("States")
+        axs.set_yticks(np.arange(N) + 0.5)
+        axs.set_yticklabels(np.arange(N-1,-1,-1))
+        axs.set_xlim(0, AVE_STATES.shape[1])
+        axs.set_ylim(0, AVE_STATES.shape[0])
+        plt.savefig('../Images/Social_HMM/EnterArena_EachState_' + Mouse_title + '.png')
     
-    if pellet_delivery: PelletDeliveries(n=N)
-    if state_before_visit: StateBeforeVisit(n=N)
-    if start_visit: StartVisit(n=N)
-    if end_visit: EndVisit(n=N)
+    if pellet_delivery: PelletDeliveries(N)
+    if state_before_visit: StateBeforeVisit(N)
+    if start_visit: StartVisit(N)
+    if end_visit: EndVisit(N)
+    if enter_arena: EnterArena()
+    print('Display_HMM_States_Characterization Completed')
 
 def main():
+    for label in LABELS:
+        type_name, mouse_name = label[0], label[1]
+        Mouse = mouse.Mouse(aeon_exp='AEON3', type = type_name, mouse = mouse_name)
+        
+        '''-------------------------------BODY-------------------------------'''
+        Mouse.body_info.Run()
+        Display_Body_Info(Mouse, Bodylength = True, Bodyangle = True, Nose = True)
+        '''
+        Display_Body_Info_Comparison(Mice = [Mouse], Bodylength = True, Bodyangle = True, Nose = True)
+        '''
     
-    Mouse = mouse.Mouse(aeon_exp='AEON3', type = 'Pre', mouse = 'BAA-1104045')
-    
-    '''-------------------------------LDS-------------------------------'''
-    Display_LDS_Trace(Mouse.mouse_pos, title = '../Images/Social_LDS/' + Mouse.type + '_' + Mouse.mouse + '.png')
-    Display_Kinematics_Distribution_Along_Time(Mouse.mouse_pos, title = '../Images/Social_LDS/Distribution_' + Mouse.type + '_' + Mouse.mouse + '.png')
-    Display_Kinematics_Properties_Along_Time(Mouse.mouse_pos,  title = '../Images/Social_LDS/Properties_' + Mouse.type + '_' + Mouse.mouse + '.png')
-    
-    
-    '''-------------------------------HMM-------------------------------'''
-    Mouse.hmm.Get_TransM()
-    Display_LDS_Trace(Mouse.hmm.TransM, title = '../Images/Social_HMM/TransM_' + Mouse.type + '_' + Mouse.mouse + '.png')
-    
-    Mouse.hmm.Get_States()
-    Display_HMM_STates_Along_Time(Mouse.mouse_pos, Mouse.hmm.states, Mouse.active_chunk[0], Mouse.active_chunk[1], title = '../Images/Social_HMM/EachState/' + Mouse.type + '_' + Mouse.mouse + '.png') 
-    
-    Mouse.arena.Get_Pellets()
-    Mouse.arena.Get_Visits()
-    Display_HMM_States_Characterization(Mouse, 
-                                        pellet_delivery = True,
-                                        state_before_visit = False,
-                                        start_visit = True,
-                                        end_visit = True,
-                                        N=Mouse.hmm.n_state)
-
+        '''-------------------------------LDS-------------------------------'''
+        '''
+        Display_LDS_Trace(Mouse.mouse_pos, title = '../Images/Social_LDS/' + Mouse.type + '_' + Mouse.mouse + '.png')
+        Display_Kinematics_Distribution_Along_Time(Mouse.mouse_pos, title = '../Images/Social_LDS/Distribution_' + Mouse.type + '_' + Mouse.mouse + '.png')
+        Display_Kinematics_Properties_Along_Time(Mouse.mouse_pos,  title = '../Images/Social_LDS/Properties_' + Mouse.type + '_' + Mouse.mouse + '.png')
+        '''
+        
+        '''-------------------------------HMM-------------------------------'''
+        '''
+        Mouse.hmm.Get_TransM()
+        Display_LDS_Trace(Mouse.hmm.TransM, title = '../Images/Social_HMM/TransM_' + Mouse.type + '_' + Mouse.mouse + '.png')
+        
+        Mouse.hmm.Get_States()
+        Display_HMM_STates_Along_Time(Mouse.mouse_pos, Mouse.hmm.states, Mouse.active_chunk[0], Mouse.active_chunk[1], title = '../Images/Social_HMM/EachState/' + Mouse.type + '_' + Mouse.mouse + '.png') 
+        
+        Mouse.hmm.n_state = 12
+        Mouse.hmm.feature = 'Kinematics_and_Body'
+        Mouse.hmm.Get_Features()
+        Mouse.hmm.Get_States()
+        Mouse.arena.Get_Pellets()
+        Mouse.arena.Get_Visits()
+        Display_HMM_States_Characterization(Mouse, 
+                                            pellet_delivery = False,
+                                            state_before_visit = False,
+                                            start_visit = False,
+                                            end_visit = False,
+                                            enter_arena = True)'''
 
 if __name__ == "__main__":
         main()
