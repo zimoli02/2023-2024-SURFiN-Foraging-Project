@@ -93,6 +93,7 @@ class HMM:
         try:
             self.states = np.load('../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
         except FileNotFoundError:
+            if self.model == None: self.Fit_Model()
             obs = np.array(self.mouse.mouse_pos[self.features])
             #self.loglikelihood = self.model.fit(obs, method="em", num_iters=50, init_method="kmeans")
             self.states = self.model.most_likely_states(obs)
@@ -104,6 +105,23 @@ class HMM:
             for i, val in enumerate(index): new_values[self.states == val] = i
             self.states = new_values
             np.save('../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", self.states)
+            
+    def Process_States(self):
+        def State_Probability(self, mouse_pos, time_seconds = 10):
+            grouped = mouse_pos.groupby([pd.Grouper(freq=str(time_seconds)+'S'), 'state']).size()
+            prob = grouped.groupby(level=0).apply(lambda g: g / g.sum())
+            states_prob = prob.unstack(level=-1).fillna(0)
+            states_prob.index = states_prob.index.get_level_values(0)
+            max_columns = states_prob.idxmax(axis=1)
+            states_prob = pd.DataFrame(0, index=states_prob.index, columns=states_prob.columns)
+            return states_prob
+        
+        def State_Dominance(self, mouse_pos, time_seconds = 10):
+            states_prob = State_Probability(mouse_pos, time_seconds)
+            for row in range(len(states_prob)):
+                col = max_columns[row]
+                states_prob.at[states_prob.index[row], col] = 1
+            return states_prob
             
 class Arena:
     def __init__(self, mouse, origin = [709.4869937896729, 546.518087387085], radius = 511):
@@ -538,7 +556,6 @@ class Body_Info:
         cos_theta = np.clip(cos_theta, -1.0, 1.0)
         radians_theta = np.arccos(cos_theta)
         return np.degrees(radians_theta)
-
 
 class Mouse:
     def __init__(self, aeon_exp, type, mouse):
