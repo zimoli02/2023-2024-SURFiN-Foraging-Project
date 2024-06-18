@@ -2,10 +2,14 @@ import cv2
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import statsmodels.api as sm
 from collections import Counter
 import h5py
 from datetime import datetime, timedelta
 import torch
+import tensorflow as tf
+from tensorflow import keras
 
 
 import sys
@@ -29,6 +33,67 @@ from aeon.analysis.utils import visits, distancetravelled
 
 nodes_name = ['nose', 'head', 'right_ear', 'left_ear', 'spine1', 'spine2','spine3', 'spine4']
 
+class Regression:
+    def __init__(self, VISITS):
+        self.visits = VISITS
+        self.predictor = 'duration'
+        self.regressor = None
+        self.X = None
+        self.Y = None 
+        self.split_perc = 0.5
+    def Get_Variables(self):
+        self.X = self.visits[self.regressor]
+        #scaler = StandardScaler()
+        #self.X = pd.DataFrame(scaler.fit_transform(X), index = X.index, columns = X.columns)
+        self.X['interc'] = 1
+        self.Y = self.visits[[self.predictor]]
+    def Linear_Regression(self):
+        self.Get_Variables()
+        split_size = int(len(self.Y) * self.split_perc)
+        indices = np.arange(len(self.Y))
+        
+        corre_max = -1
+        for i in range(1000):
+            np.random.shuffle(indices)
+            
+            train_indices = indices[:split_size]
+            test_indices = indices[split_size:]
+
+            X_train, X_test = self.X.iloc[train_indices], self.X.iloc[test_indices]
+            Y_train, Y_test = self.Y.iloc[train_indices], self.Y.iloc[test_indices]
+            
+            model = sm.GLM(Y_train, X_train, family=sm.families.Gaussian())
+            result = model.fit()
+            Y_test_pred = result.predict(X_test)
+
+            corre = np.corrcoef(Y_test_pred.to_numpy(), Y_test.to_numpy().reshape(1,-1)[0])[0,1]
+            if corre > corre_max:  
+                result_valid = result
+                x_test, y_test = X_test, Y_test
+                corre_max = corre
+            
+        y_pred = result_valid.predict(x_test)
+        
+        return y_test.to_numpy().reshape(1,-1)[0], y_pred.to_numpy()
+
+    def Multilayer_Perceptron(self):
+        self.Get_Variables()
+        self.X = self.X.to_numpy().astype(np.float32)
+        self.Y = self.Y.to_numpy().reshape(1,-1)[0].astype(np.float32)
+        mid_point = int(len(self.Y)/2)
+        input_shape = (len(self.regressor)+1,)
+        model = keras.Sequential([
+            keras.layers.Dense(64, activation='relu', input_shape=input_shape),
+            keras.layers.Dense(32, activation='relu'),
+            keras.layers.Dense(1, activation='softmax')
+        ])
+        model.compile(optimizer='adam',
+            loss='mean_squared_error',
+            metrics=['mae'])
+        model.fit(self.X[:mid_point], self.Y[:mid_point], epochs=100, batch_size=32)
+        predictions = model.predict(self.X[mid_point:])
+        return self.Y[mid_point:], predictions
+    
 class HMM:
     def __init__(self, mouse):
         self.mouse = mouse
@@ -41,6 +106,7 @@ class HMM:
         self.states = None
         self.TransM = None
         self.loglikelihood = None
+        self.process_states = self.Process_States()
         
     def Get_Features(self):
         if self.feature == 'Kinematics': self.features = ['smoothed_speed', 'smoothed_acceleration']
@@ -67,14 +133,14 @@ class HMM:
         self.feature = feature
         self.Get_Features()
         fitting_input = np.array(self.mouse.mouse_pos[self.model_period[0]:self.model_period[1]][self.features])
-        obs = np.array(self.mouse.mouse_pos[self.model_period[0] + pd.Timedelta('1D'):self.model_period[1]+pd.Timedelta('1D')][self.features])
+        inferring_input = np.array(self.mouse.mouse_pos[self.model_period[0] + pd.Timedelta('1D'):self.model_period[1]+pd.Timedelta('1D')][self.features])
         
         self.model = ssm.HMM(self.n_state, len(fitting_input[0]), observations="gaussian")
-        self.loglikelihood = self.model.fit(obs, method="em", num_iters=50, init_method="kmeans")
+        self.loglikelihood = self.model.fit(fitting_input, method="em", num_iters=50, init_method="kmeans")
         self.parameters = self.model.observations.params[0].T
         
-        self.states = self.model.most_likely_states(obs)
-        self.loglikelihood = self.model.log_likelihood(obs)
+        self.states = self.model.most_likely_states(inferring_input)
+        self.loglikelihood = self.model.log_likelihood(inferring_input)
         
         state_mean_speed = self.parameters[0]
         index = np.argsort(state_mean_speed, -1) 
@@ -106,22 +172,41 @@ class HMM:
             self.states = new_values
             np.save('../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", self.states)
             
-    def Process_States(self):
+    class Process_States:
+        def __init__(self):
+            self.name = None
+            
         def State_Probability(self, mouse_pos, time_seconds = 10):
+            if 'state' not in mouse_pos.columns: mouse_pos['state'] = self.states
             grouped = mouse_pos.groupby([pd.Grouper(freq=str(time_seconds)+'S'), 'state']).size()
             prob = grouped.groupby(level=0).apply(lambda g: g / g.sum())
             states_prob = prob.unstack(level=-1).fillna(0)
             states_prob.index = states_prob.index.get_level_values(0)
             max_columns = states_prob.idxmax(axis=1)
-            states_prob = pd.DataFrame(0, index=states_prob.index, columns=states_prob.columns)
-            return states_prob
+            return max_columns, states_prob
         
         def State_Dominance(self, mouse_pos, time_seconds = 10):
-            states_prob = State_Probability(mouse_pos, time_seconds)
+            max_columns, states_prob = self.State_Probability(mouse_pos, time_seconds)
+            states_prob = pd.DataFrame(0, index=states_prob.index, columns=states_prob.columns)
             for row in range(len(states_prob)):
                 col = max_columns[row]
                 states_prob.at[states_prob.index[row], col] = 1
             return states_prob
+        
+        def State_Timewindow(self, mouse_pos, timewindow = 10):
+            def Calculate_Count_Curve(states, target_state, window_size):
+                count_curve = np.zeros(len(states))
+                for i in range(len(states) - window_size + 1):
+                    window = states[i:i+window_size]
+                    count = np.count_nonzero(window == target_state)
+                    count_curve[i] = count/window_size
+                return count_curve
+            
+            N = self.n_state
+            for i in range(N): 
+                mouse_pos.loc[mouse_pos.index, 'State' + str(i)] = Calculate_Count_Curve(mouse_pos['state'].to_numpy(), target_state = i, window_size = timewindow)
+            return mouse_pos
+            
             
 class Arena:
     def __init__(self, mouse, origin = [709.4869937896729, 546.518087387085], radius = 511):

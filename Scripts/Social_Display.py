@@ -26,7 +26,7 @@ import aeon
 import aeon.io.api as api
 from aeon.io import reader, video
 from aeon.schema.schemas import social02
-
+#,
 LABELS = [
     ['Pre','BAA-1104045'],
     ['Pre','BAA-1104047'],
@@ -330,7 +330,21 @@ def Display_Kinematics_Properties_Along_Time(Mouse, file_path):
     plt.savefig(title)
     print('Display_Kinematics_Properties_Along_Time Completed')
 
-'''-------------------------------HMM-------------------------------'''    
+'''-------------------------------HMM-------------------------------'''   
+def Display_Model_Selection(Mouse, N, file_path):
+    Mouse_title = Mouse.type + '_' + Mouse.mouse
+    Loglikelihood = []
+    for n in N:
+        Mouse.hmm.Fit_Model_without_Saving(n_state = n, feature = 'Kinematics_and_Body')
+        Loglikelihood.append(Mouse.hmm.loglikelihood)
+        print('End Inference for n = ', str(n))
+    Loglikelihood = np.array(Loglikelihood)
+    fig, axs = plt.subplots(1,1,figsize = (10,7))
+    axs.scatter(N, Loglikelihood)
+    axs.plot(N, Loglikelihood, color = 'black')
+    axs.set_xticks(N)
+    plt.savefig(file_path + Mouse_title + '.png')
+
 def Display_HMM_TransM(Mouse, file_path):
     Mouse_title = Mouse.type + '_' + Mouse.mouse
     TransM = Mouse.hmm.TransM
@@ -351,7 +365,7 @@ def Display_HMM_States_Along_Time(Mouse, file_path):
     mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
     mouse_pos = mouse_pos[start:end]
     
-    states_prob = Mouse.hmm.Process_States.State_Dominance(mouse_pos, time_seconds = 10)
+    states_prob = Mouse.hmm.process_states.State_Dominance(mouse_pos, time_seconds = 10)
     states_prob['CR'] = 0
     CR_index_1 = states_prob[states_prob.index.hour < 7].index
     CR_index_2 = states_prob[states_prob.index.hour > 19].index
@@ -520,11 +534,6 @@ def Display_HMM_States_Predicting_Behavior_Gaussian(Mouse, pellet_delivery = Tru
         for p in p_: P *= p
         return P
 
-    def Calculate_All_Count_Curve (mouse_pos):
-        states_prob = Mouse.hmm.Process_States.State_Probability(mouse_pos, time_seconds = 10)
-        for i in range(N): mouse_pos.loc[mouse_pos.index, 'State' + str(i)] = states_prob[i].to_numpy()
-        return mouse_pos
-    
     def Summarize(event_name, Events):
         mouse_pos_ = mouse_pos.copy()[Active_Chunk[0]:Active_Chunk[1]]
 
@@ -633,7 +642,7 @@ def Display_HMM_States_Predicting_Behavior_Gaussian(Mouse, pellet_delivery = Tru
     Active_Chunk = Mouse.active_chunk
     Predicting_Chunk_start = Active_Chunk[1] + pd.Timedelta('1S')
     
-    mouse_pos = Calculate_All_Count_Curve(mouse_pos)
+    mouse_pos = Mouse.hmm.process_states.State_Timewindow(mouse_pos, timewindow = 10)
 
     if pellet_delivery: 
         result = Predict(event_name = 'Pellet Delivery', Events = Pellets, file_name = 'PelletDelivery')
@@ -651,41 +660,26 @@ def Display_HMM_States_Predicting_Behavior_Gaussian(Mouse, pellet_delivery = Tru
     print('Display_HMM_States_Predicting_Behavior_Gaussian Completed')
 
 def Display_HMM_States_Predicting_Behavior_MLP(Mouse, pellet_delivery = True, start_visit = True, end_visit = True, enter_arena = True):
-    def Train(event_name, Events):
+    def Train(Events, input_length):
         mouse_pos_ = mouse_pos.copy()[Active_Chunk[0]:Active_Chunk[1]]
-
+        states_ = mouse_pos_['state'].to_numpy()
+        
         train_inputs, train_outputs = [], []
         for i in range(len(Events)):
             trigger = Events[i]
             if trigger < Active_Chunk[0] or trigger > Active_Chunk[1]: continue
             
-            latest_valid_index = mouse_pos_.loc[trigger - pd.Timedelta('4S'):trigger].index
+            latest_valid_index = mouse_pos_.loc[trigger - pd.Timedelta('5S'):trigger].index
             latest_valid_state = mouse_pos_.loc[latest_valid_index, ['state']].values.reshape(-1)
-            if len(latest_valid_state) >= 30: 
-                latest_valid_state  = latest_valid_state[-30:]
+            if len(latest_valid_state) >= input_length: 
+                latest_valid_state  = latest_valid_state[-input_length:]
                 train_inputs.append(latest_valid_state)
                 train_outputs.append(1)
             
-            latest_valid_index = mouse_pos_.loc[trigger - pd.Timedelta('7S'):trigger- pd.Timedelta('3S')].index
-            latest_valid_state = mouse_pos_.loc[latest_valid_index, ['state']].values.reshape(-1)
-            if len(latest_valid_state) >= 30: 
-                latest_valid_state  = latest_valid_state[-30:]
-                train_inputs.append(latest_valid_state)
-                train_outputs.append(0.5)
-            
-            next_valid_index = mouse_pos_.loc[trigger:trigger + pd.Timedelta('3S')].index
-            next_valid_state = mouse_pos_.loc[next_valid_index, ['state']].values.reshape(-1)
-            if len(next_valid_state) >= 30: 
-                next_valid_state  = next_valid_state[:30]   
-                train_inputs.append(next_valid_state)
-                train_outputs.append(-0.3)       
-                
-            next_valid_index = mouse_pos_.loc[trigger + pd.Timedelta('3S'):trigger + pd.Timedelta('7S')].index
-            next_valid_state = mouse_pos_.loc[next_valid_index, ['state']].values.reshape(-1)
-            if len(next_valid_state) >= 30: 
-                next_valid_state  = next_valid_state[:30]   
-                train_inputs.append(next_valid_state)
-                train_outputs.append(0) 
+            random_start = np.random.randint(len(mouse_pos_)-input_length)        
+            next_valid_state  = states_[random_start:random_start+input_length]   
+            train_inputs.append(next_valid_state)
+            train_outputs.append(0) 
                 
         train_inputs, train_outputs = np.array(train_inputs), np.array(train_outputs)
         train_inputs = train_inputs.astype(np.int32)
@@ -699,30 +693,30 @@ def Display_HMM_States_Predicting_Behavior_MLP(Mouse, pellet_delivery = True, st
         model.compile(optimizer='adam',
                     loss='sparse_categorical_crossentropy',
                     metrics=['accuracy'])
-        model.fit(train_inputs, train_outputs, epochs=50, batch_size=32)
+        model.fit(train_inputs, train_outputs, epochs=100, batch_size=32)
         
         return model
             
-    def Predict(event_name, Events, file_name):
-        model = Train(event_name, Events)
+    def Predict(event_name, Events, input_length, file_name):
+        model = Train(Events, input_length)
         mouse_pos_ = mouse_pos.copy()[Predicting_Chunk_start:]
         test_indices = mouse_pos_.index
         test_inputs = []
         state = mouse_pos_['state'].to_numpy()
-        for i in range(0, len(state)-30, 10):
-            states = state[i: i+30]
+        for i in range(0, len(state)-input_length, 10):
+            states = state[i: i+input_length]
             test_inputs.append(states)
         test_inputs = np.array(test_inputs)
         test_inputs = test_inputs.astype(np.int32)
         
         predictions = model.predict((np.array(test_inputs)))
         predicted_labels = np.argmax(predictions, axis=1)
-        output_values = [-0.3, 0, 0.5, 1]
+        output_values = [0, 1]
         predicted_outputs = [output_values[label] for label in predicted_labels]
         
         mouse_pos_.loc[test_indices, 'pred'] = 0
-        for i in range(0,len(test_indices)-30, 10):
-            mouse_pos_.loc[test_indices[i+30], 'pred'] = predicted_outputs[int(i/10)]
+        for i in range(0,len(test_indices)-input_length, 10):
+            mouse_pos_.loc[test_indices[i+input_length], 'pred'] = predicted_outputs[int(i/10)]
         
         fig, axs = plt.subplots(1, 1, figsize=(30, 4))
         mouse_pos_.pred.plot(ax = axs, color = 'black')
@@ -743,27 +737,49 @@ def Display_HMM_States_Predicting_Behavior_MLP(Mouse, pellet_delivery = True, st
     Visits = Mouse.arena.visits
     Entry = Mouse.arena.entry 
     Starts = Visits['start']
-    Ends = Visitis['end']
+    Ends = Visits['end']
 
     Active_Chunk = Mouse.active_chunk
     Predicting_Chunk_start = Active_Chunk[1] + pd.Timedelta('1S')
     
     if pellet_delivery: 
-        result = Predict(event_name = 'Pellet Delivery', Events = Pellets, file_name = 'PelletDelivery')
+        result = Predict(event_name = 'Pellet Delivery', Events = Pellets, input_length = 30, file_name = 'PelletDelivery')
         print(result)
     if start_visit: 
-        result = Predict(event_name = 'Move Wheel', Events = Starts, file_name = 'EnterVisit')
+        result = Predict(event_name = 'Move Wheel', Events = Starts, input_length = 30, file_name = 'EnterVisit')
         print(result)
     if end_visit: 
-        result = Predict(event_name = 'Leave Wheel', Events = Ends, file_name = 'EndVisit')
+        result = Predict(event_name = 'Leave Wheel', Events = Ends, input_length = 30, file_name = 'EndVisit')
         print(result)
     if enter_arena: 
-        result = Predict(event_name = 'Enter Arena', Events = Entry, file_name = 'EnterArena')
+        result = Predict(event_name = 'Enter Arena', Events = Entry, input_length = 30, file_name = 'EnterArena')
         print(result)
     
     print('Display_HMM_States_Predicting_Behavior_MLP Completed')
 
+'''-------------------------------REGRESSION-------------------------------'''  
+def Display_Visit_Prediction(VISITS, model, file_path, title):
+    regression = mouse.Regression(VISITS)
+    regression.regressor = ['speed', 'acceleration', 'last_pellets_self', 'last_pellets_other','last_duration', 'last_interval','last_pellets_interval', 'entry']
+    
+    if model == 'linear': 
+        obs, pred = regression.Linear_Regression()
+    if model == 'MLP': 
+        obs, pred = regression.Multilayer_Perceptron()
+    
+    fig, axs = plt.subplots(1, 1, figsize=(10, 10))
+    axs.scatter(obs, pred, s = 10)    
+    axs.set_xlabel('Observation', fontsize = 24)
+    axs.set_ylabel('Prediction', fontsize = 24)
+    axs.spines['top'].set_visible(False)
+    axs.spines['right'].set_visible(False)
+    #axs.legend(fontsize = 20)
+    #axs.set_ylim((-max(obs)-1, max(obs)+1))
+    plt.tight_layout()
+    plt.savefig(file_path + title)
+
 def main():
+    VISITS = []
     for label in LABELS:
         type_name, mouse_name = label[0], label[1]
         print('Start Processing: ', type_name, "-", mouse_name)
@@ -772,30 +788,34 @@ def main():
         
         '''-------------------------------BODY-------------------------------'''
         
-        NODES = [['head', 'spine3'],['spine1', 'spine3'],['left_ear', 'spine3'],['right_ear', 'spine3']]
+        '''NODES = [['head', 'spine3'],['spine1', 'spine3'],['left_ear', 'spine3'],['right_ear', 'spine3']]
         for nodes in NODES:
             Mouse.Add_Body_Info_to_mouse_pos(property = 'distance', nodes = nodes)
-            Display_Body_Info(Mouse, property = 'distance', nodes = nodes)
-        
-        Display_Body_Info_Characterization(Mouse, NODES,
+            #Display_Body_Info(Mouse, property = 'distance', nodes = nodes)'''
+        Mouse.Run_Visits()
+        VISITS.append(Mouse.arena.visits)
+        '''Display_Body_Info_Characterization(Mouse, NODES,
                                             pellet_delivery = True,
                                             start_visit = True,
                                             end_visit = True,
-                                            enter_arena = True)
+                                            enter_arena = True)'''
 
     
         '''-------------------------------LDS-------------------------------'''
         
-        Display_LDS_Trace(Mouse, file_path = '../Images/Social_LDS/')
+        '''Display_LDS_Trace(Mouse, file_path = '../Images/Social_LDS/')
         Display_Kinematics_Distribution_Along_Time(Mouse, file_path = '../Images/Social_LDS/Distribution_')
-        Display_Kinematics_Properties_Along_Time(Mouse,  file_path = '../Images/Social_LDS/Properties_')
+        Display_Kinematics_Properties_Along_Time(Mouse,  file_path = '../Images/Social_LDS/Properties_')'''
         
         
         '''-------------------------------HMM-------------------------------'''
+        #Display_Model_Selection(Mouse, N = np.arange(3, 27), file_path = '../Images/Social_HMM/StateNumber/')
+        
         #Mouse.hmm.Fit_Model(n_state = 12, feature = 'Kinematics_and_Body')
+        '''
         Mouse.hmm.n_state = 20
         Mouse.hmm.feature = 'Kinematics_and_Body'
-        Mouse.hmm.Get_TransM(n_state = 20, feature = 'Kinematics_and_Body')
+        #Mouse.hmm.Get_TransM(n_state = 20, feature = 'Kinematics_and_Body')
         Mouse.hmm.Get_States()
         Mouse.Run_Visits()
         
@@ -816,9 +836,13 @@ def main():
                                                     pellet_delivery = True,
                                                     start_visit = True,
                                                     end_visit = True,
-                                                    enter_arena = True)
-        
-
+                                                    enter_arena = True)'''
+        Display_Visit_Prediction(Mouse.arena.visits, model = 'linear', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'Linear_Regression.png')                                            
+        Display_Visit_Prediction(Mouse.arena.visits, model = 'MLP', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'MLP.png') 
+    '''-------------------------------REGRESSION-------------------------------''' 
+    VISITS = pd.concat(VISITS, ignore_index=True)
+    Display_Visit_Prediction(VISITS, model = 'linear', file_path = '../Images/Social_Regression/All-Mice/', title = 'Linear_Regression.png')                                            
+    Display_Visit_Prediction(VISITS, model = 'MLP', file_path = '../Images/Social_Regression/All-Mice/', title = 'MLP.png') 
 
 if __name__ == "__main__":
         main()
