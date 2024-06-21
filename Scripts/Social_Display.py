@@ -785,6 +785,7 @@ def main():
         print('Start Processing: ', type_name, "-", mouse_name)
         
         Mouse = mouse.Mouse(aeon_exp='AEON3', type = type_name, mouse = mouse_name)
+        Mouse.Get_Mouse_Pos()
         
         '''-------------------------------BODY-------------------------------'''
         
@@ -792,8 +793,8 @@ def main():
         for nodes in NODES:
             Mouse.Add_Body_Info_to_mouse_pos(property = 'distance', nodes = nodes)
             #Display_Body_Info(Mouse, property = 'distance', nodes = nodes)'''
-        Mouse.Run_Visits()
-        VISITS.append(Mouse.arena.visits)
+        #Mouse.Run_Visits()
+        #VISITS.append(Mouse.arena.visits)
         '''Display_Body_Info_Characterization(Mouse, NODES,
                                             pellet_delivery = True,
                                             start_visit = True,
@@ -803,9 +804,10 @@ def main():
     
         '''-------------------------------LDS-------------------------------'''
         
-        '''Display_LDS_Trace(Mouse, file_path = '../Images/Social_LDS/')
+        '''Display_LDS_Trace(Mouse, file_path = '../Images/Social_LDS/')'''
+        
         Display_Kinematics_Distribution_Along_Time(Mouse, file_path = '../Images/Social_LDS/Distribution_')
-        Display_Kinematics_Properties_Along_Time(Mouse,  file_path = '../Images/Social_LDS/Properties_')'''
+        Display_Kinematics_Properties_Along_Time(Mouse,  file_path = '../Images/Social_LDS/Properties_')
         
         
         '''-------------------------------HMM-------------------------------'''
@@ -837,12 +839,16 @@ def main():
                                                     start_visit = True,
                                                     end_visit = True,
                                                     enter_arena = True)'''
+        
+        
+        '''-------------------------------REGRESSION-------------------------------'''                                          
+        '''
         Display_Visit_Prediction(Mouse.arena.visits, model = 'linear', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'Linear_Regression.png')                                            
-        Display_Visit_Prediction(Mouse.arena.visits, model = 'MLP', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'MLP.png') 
-    '''-------------------------------REGRESSION-------------------------------''' 
-    VISITS = pd.concat(VISITS, ignore_index=True)
+        Display_Visit_Prediction(Mouse.arena.visits, model = 'MLP', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'MLP.png')''' 
+    
+    '''VISITS = pd.concat(VISITS, ignore_index=True)
     Display_Visit_Prediction(VISITS, model = 'linear', file_path = '../Images/Social_Regression/All-Mice/', title = 'Linear_Regression.png')                                            
-    Display_Visit_Prediction(VISITS, model = 'MLP', file_path = '../Images/Social_Regression/All-Mice/', title = 'MLP.png') 
+    Display_Visit_Prediction(VISITS, model = 'MLP', file_path = '../Images/Social_Regression/All-Mice/', title = 'MLP.png') '''
 
 if __name__ == "__main__":
         main()

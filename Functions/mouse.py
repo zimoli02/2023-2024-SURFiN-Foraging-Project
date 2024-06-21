@@ -41,12 +41,14 @@ class Regression:
         self.X = None
         self.Y = None 
         self.split_perc = 0.5
+        
     def Get_Variables(self):
         self.X = self.visits[self.regressor]
         #scaler = StandardScaler()
         #self.X = pd.DataFrame(scaler.fit_transform(X), index = X.index, columns = X.columns)
         self.X['interc'] = 1
         self.Y = self.visits[[self.predictor]]
+        
     def Linear_Regression(self):
         self.Get_Variables()
         split_size = int(len(self.Y) * self.split_perc)
@@ -83,10 +85,13 @@ class Regression:
         mid_point = int(len(self.Y)/2)
         input_shape = (len(self.regressor)+1,)
         model = keras.Sequential([
-            keras.layers.Dense(64, activation='relu', input_shape=input_shape),
-            keras.layers.Dense(32, activation='relu'),
-            keras.layers.Dense(1, activation='softmax')
-        ])
+                                    keras.layers.Dense(128, activation='relu', input_shape=input_shape),
+                                    keras.layers.Dense(64, activation='relu'),
+                                    keras.layers.Dropout(0.2),  # Dropout layer for regularization
+                                    keras.layers.Dense(32, activation='relu'),
+                                    keras.layers.Dense(1, activation='relu')  # Output layer with ReLU activation for non-negative predictions
+                                ])
+
         model.compile(optimizer='adam',
             loss='mean_squared_error',
             metrics=['mae'])
@@ -430,12 +435,14 @@ class Arena:
 class Kinematics:
     def __init__(self, session):
         self.session = session
-        self.inference_chunk = np.array([9, 10])
         self.manual_parameters = self.Get_Manual_Parameters()
         self.parameters = {}
         self.filterRes = None
         self.smoothRes = None
-    def Run(self):
+        self.mouse = None
+        
+    def Run(self, mouse=None):
+        self.mouse = mouse
         self.Infer_Parameters()
         self.Inference() 
         
@@ -540,13 +547,19 @@ class Kinematics:
 
         return sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value[0], B, m0, V0, Z, R
     
+    def Get_Observations(self):
+        active_chunk = self.mouse.active_chunk
+        mouse_pos = self.session.mouse_pos[active_chunk[0] + pd.Timedelta('3H'):active_chunk[0] + pd.Timedelta('4H')]
+        return mouse_pos
+    
     def Infer_Parameters(self):
         try:
             P = np.load('../SocialData/LDS_Parameters/' + self.session.start + '_Parameters.npz', allow_pickle=True)
             sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, V0, Z, R = P['sigma_a'].item(), P['sigma_x'].item(), P['sigma_y'].item(), P['sqrt_diag_V0_value'].item(), P['B'], P['Qe'], P['m0'], P['V0'], P['Z'], P['R']
         except FileNotFoundError:
             #10Hz Data
-            obs = np.transpose(self.session.mouse_pos[["x", "y"]].to_numpy())[:, :20*60*10]
+            mouse_pos = self.Get_Observations()
+            obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())
             
             params = self.manual_parameters
             sigma_a = params['sigma_a']
@@ -699,7 +712,7 @@ class Mouse:
         mouse_pos = []
         for i in range(len(self.starts)):
             session = Session(aeon_exp = self.aeon_exp, type = self.type, mouse = self.mouse, start = self.starts[i], end = self.ends[i])
-            session.Add_Kinematics()
+            session.Add_Kinematics(self)
             mouse_pos.append(session.mouse_pos)
         mouse_pos = pd.concat(mouse_pos, ignore_index=False)
         return mouse_pos
@@ -818,8 +831,8 @@ class Session:
         mouse_pos['y'] = mouse_pos['y'].interpolate()
         return mouse_pos
     
-    def Add_Kinematics(self):
-        self.kinematics.Run()
+    def Add_Kinematics(self, mouse = None):
+        self.kinematics.Run(mouse)
         smoothRes = self.kinematics.smoothRes
         self.mouse_pos['smoothed_position_x'] = pd.Series(smoothRes['xnN'][0][0], index=self.mouse_pos.index)
         self.mouse_pos['smoothed_position_y'] = pd.Series(smoothRes['xnN'][3][0], index=self.mouse_pos.index)
