@@ -111,7 +111,7 @@ class HMM:
         self.states = None
         self.TransM = None
         self.loglikelihood = None
-        self.process_states = self.Process_States()
+        self.process_states = self.Process_States(self)
         
     def Get_Features(self):
         if self.feature == 'Kinematics': self.features = ['smoothed_speed', 'smoothed_acceleration']
@@ -178,11 +178,11 @@ class HMM:
             np.save('../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", self.states)
             
     class Process_States:
-        def __init__(self):
-            self.name = None
+        def __init__(self, hmm):
+            self.hmm = hmm
             
         def State_Probability(self, mouse_pos, time_seconds = 10):
-            if 'state' not in mouse_pos.columns: mouse_pos['state'] = self.states
+            if 'state' not in mouse_pos.columns: mouse_pos['state'] = self.hmm.states
             grouped = mouse_pos.groupby([pd.Grouper(freq=str(time_seconds)+'S'), 'state']).size()
             prob = grouped.groupby(level=0).apply(lambda g: g / g.sum())
             states_prob = prob.unstack(level=-1).fillna(0)
@@ -207,11 +207,32 @@ class HMM:
                     count_curve[i] = count/window_size
                 return count_curve
             
-            N = self.n_state
+            N = self.hmm.n_state
             for i in range(N): 
                 mouse_pos.loc[mouse_pos.index, 'State' + str(i)] = Calculate_Count_Curve(mouse_pos['state'].to_numpy(), target_state = i, window_size = timewindow)
             return mouse_pos
             
+        def Event_Triggering(self, mouse_pos, Events, left_seconds, right_seconds, variable = 'state', insert_nan = 1):
+            left_period = pd.Timedelta(str(left_seconds+1) + 'S')
+            right_period = pd.Timedelta(str(right_seconds+1) + 'S')
+            VARIABLES = []
+            for i in range(len(Events)):
+                trigger = Events[i]
+                
+                latest_valid_index = mouse_pos.loc[trigger - left_period:trigger, variable].index
+                latest_valid_variable = mouse_pos.loc[latest_valid_index, [variable]].values.reshape(-1)
+                if len(latest_valid_variable) >= 10*left_seconds: latest_valid_variable  = latest_valid_variable[-10*left_seconds:]
+                
+                next_valid_index = mouse_pos.loc[trigger:trigger + right_period, variable].index
+                next_valid_variable = mouse_pos.loc[next_valid_index, [variable]].values.reshape(-1)
+                if len(next_valid_variable) >= 10*right_seconds: next_valid_variable  = next_valid_variable[:10*right_seconds]
+                
+                if insert_nan == 1: Variable = np.concatenate((latest_valid_variable, np.array([np.nan]), next_valid_variable))
+                else: Variable = np.concatenate((latest_valid_variable, next_valid_variable))
+                
+                if len(Variable) == 10*(left_seconds + right_seconds) + insert_nan: 
+                    VARIABLES.append(Variable)
+            return np.array(VARIABLES)
             
 class Arena:
     def __init__(self, mouse, origin = [709.4869937896729, 546.518087387085], radius = 511):
@@ -219,6 +240,7 @@ class Arena:
         self.root = self.mouse.root
         self.start = self.mouse.mouse_pos.index[0]
         self.end = self.mouse.mouse_pos.index[-1]
+        self.starts = self.Get_Starts()
         self.origin = origin
         self.radius = radius
         self.entry = self.Entry()
@@ -227,9 +249,16 @@ class Arena:
         self.move_wheel_interval_seconds = 10
         self.pre_visit_seconds = 10
         
-        self.pellets_per_patch = None
-        self.pellets = None
+        self.pellets_per_patch = self.Get_Pellets_per_Patch()
+        self.pellets = self.Get_Pellets()
         self.visits = None
+    
+    def Get_Starts(self):
+        starts = []
+        for i in range(len(self.mouse.starts)):
+            start = pd.Timestamp(datetime.strptime(self.mouse.starts[i], '%Y-%m-%dT%H-%M-%S'))
+            starts.append(start)
+        return starts
     
     def Entry(self):
         mouse_pos_ = self.mouse.mouse_pos.copy()
@@ -256,18 +285,16 @@ class Arena:
         social02.Patch3.DeliverPellet.value = 1
         pellets3 = aeon.load(self.root, social02.Patch3.DeliverPellet, start=self.start, end=self.end)
             
-        self.pellets_per_patch = {'Patch1':pellets1, 'Patch2':pellets2, 'Patch3':pellets3}
+        return {'Patch1':pellets1, 'Patch2':pellets2, 'Patch3':pellets3}
         
     def Get_Pellets(self):
         try:
             PELLET = pd.read_parquet('../SocialData/Pellets/'+ self.mouse.type + "_" + self.mouse.mouse +'_PELLET.parquet', engine='pyarrow')
         except FileNotFoundError:
-            if self.pellets_per_patch == None: self.Get_Pellets_per_Patch()
-            
             PELLET = pd.concat([self.pellets_per_patch['Patch1'],self.pellets_per_patch['Patch2'], self.pellets_per_patch['Patch3']], ignore_index=False)
             PELLET = PELLET.sort_index()
             PELLET.to_parquet('../SocialData/Pellets/'+ self.mouse.type + "_" + self.mouse.mouse +'_PELLET.parquet', engine='pyarrow')
-        self.pellets = PELLET
+        return PELLET
         print('Get_Pellets Completed')
     
     def Move_Wheel(self, start, end, patch):
@@ -275,7 +302,10 @@ class Arena:
         starts, ends = [],[]
         while start < end:
             if start.minute != 0:
-                end_ = pd.Timestamp(year = start.year, month = start.month, day = start.day, hour = start.hour+1, minute=0, second=0) - pd.Timedelta('2S')
+                if start.hour != 23:
+                    end_ = pd.Timestamp(year = start.year, month = start.month, day = start.day, hour = start.hour+1, minute=0, second=0) - pd.Timedelta('2S')
+                else:
+                    end_ = pd.Timestamp(year = start.year, month = start.month, day = start.day+1, hour = 0, minute=0, second=0) - pd.Timedelta('2S')
             else:
                 end_ = start + pd.Timedelta('1H') - pd.Timedelta('2S')
             starts.append(start+ pd.Timedelta('1S'))
@@ -328,13 +358,13 @@ class Arena:
 
     def Visits_in_Patch(self, patch):
         visits = []
-        for i in range(len(self.mouse.starts)):
-            if i == len(self.mouse.starts) - 1: mouse_pos_ = self.mouse.mouse_pos[self.mouse.starts[i]:]
-            else: mouse_pos_ = self.mouse.mouse_pos[self.mouse.starts[i]:self.mouse.starts[i+1]]
+        for i in range(len(self.starts)):
+            if i == len(self.starts) - 1: mouse_pos_ = self.mouse.mouse_pos[self.starts[i]:]
+            else: mouse_pos_ = self.mouse.mouse_pos[self.starts[i]:self.starts[i+1]]
             start, end = mouse_pos_.index[0], mouse_pos_.index[-1]
             encoder = self.Move_Wheel(start, end, patch = patch)
         
-            visit = {'start':[],'end':[], 'duration':[], 'speed':[], 'acceleration':[], 'bodylength':[], 'bodyangle':[], 'nose' : [],'entry':[], 'patch':[], 'pellet':[]}
+            visit = {'start':[],'end':[], 'duration':[], 'speed':[], 'acceleration':[], 'entry':[], 'patch':[], 'pellet':[]}
             
             groups = encoder['Move'].ne(encoder['Move'].shift()).cumsum()
             moves = encoder[encoder['Move'] == 1].groupby(groups)['Move']
@@ -358,16 +388,16 @@ class Arena:
                 
                 visit['speed'].append(pre_visit_data['smoothed_speed'].mean())
                 visit['acceleration'].append(pre_visit_data['smoothed_acceleration'].mean())
-                visit['bodylength'].append(pre_visit_data['bodylength'].mean())
+                '''visit['bodylength'].append(pre_visit_data['bodylength'].mean())
                 visit['bodyangle'].append(pre_visit_data['bodyangle'].mean())
-                visit['nose'].append(pre_visit_data['nose'].mean())
+                visit['nose'].append(pre_visit_data['nose'].mean())'''
                 
                 #Visits['weight'].append(pre_visit_data['weight'].mean())
                 #Visits['state'].append(pre_visit_data['states'].value_counts().idxmax())
                 
                 visit['patch'].append(patch)
-                visit['pellet'].append(len(self.pellets_per_patch[patch]))
-            
+                visit['pellet'].append(len(self.pellets_per_patch[patch][visit_start:visit_end]))
+            visit = pd.DataFrame(visit)
             visits.append(visit)
         visits = pd.concat(visits, ignore_index=True)
         return visits
@@ -453,7 +483,7 @@ class Kinematics:
         acc_x0, acc_y0 = 0.0, 0.0
 
         # Manual Parameters
-        sigma_a = 1.3
+        sigma_a = 20
         sqrt_diag_V0_value = 1e-3
 
         m0 = np.array([pos_x0, vel_x0, acc_x0, pos_y0, vel_y0, acc_y0], dtype=np.double)
@@ -554,7 +584,7 @@ class Kinematics:
     
     def Infer_Parameters(self):
         try:
-            P = np.load('../SocialData/LDS_Parameters/' + self.session.start + '_Parameters.npz', allow_pickle=True)
+            P = np.load('../SocialData/LDS_Parameters/' + self.mouse.type + '_' + self.mouse.mouse + '_Parameters.npz', allow_pickle=True)
             sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, V0, Z, R = P['sigma_a'].item(), P['sigma_x'].item(), P['sigma_y'].item(), P['sqrt_diag_V0_value'].item(), P['B'], P['Qe'], P['m0'], P['V0'], P['Z'], P['R']
         except FileNotFoundError:
             #10Hz Data
@@ -574,7 +604,7 @@ class Kinematics:
             R = params['R']
 
             sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, m0, V0, Z, R = self.Learn_Parameters(obs, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z)
-            np.savez('../SocialData/LDS_Parameters/' + self.session.start + '_Parameters.npz', sigma_a = sigma_a, sigma_x = sigma_x, sigma_y = sigma_y, sqrt_diag_V0_value = sqrt_diag_V0_value, B = B, Qe = Qe, m0 = m0, V0 = V0, Z = Z, R = R)
+            np.savez('../SocialData/LDS_Parameters/'  + self.mouse.type + '_' + self.mouse.mouse + '_Parameters.npz', sigma_a = sigma_a, sigma_x = sigma_x, sigma_y = sigma_y, sqrt_diag_V0_value = sqrt_diag_V0_value, B = B, Qe = Qe, m0 = m0, V0 = V0, Z = Z, R = R)
             print('Inferring LDS Parameters Completed')
         
         parameters = {'sigma_a': sigma_a,
@@ -663,10 +693,11 @@ class Mouse:
         self.root = self.Get_Root()
         self.INFO = self.Get_INFO()
         self.starts, self.ends = self.Get_Start_Times()
-        self.body_data_x, self.body_data_y = self.Combine_SLEAP_Data()
-        self.mouse_pos = self.Get_Mouse_Pos()
         self.active_chunk = self.Get_Active_Chunk()
         
+        self.body_data_x, self.body_data_y = self.Combine_SLEAP_Data()
+        self.mouse_pos = self.Get_Mouse_Pos()
+
         self.arena = Arena(self)
         self.body_info = Body_Info(self)
         self.hmm = HMM(self)
@@ -687,6 +718,18 @@ class Mouse:
                 starts.append(self.INFO["Start"][i])
                 ends.append(self.INFO["End"][i])
         return starts, ends
+    
+    def Get_Active_Chunk(self):
+        start = datetime.strptime(self.starts[0], '%Y-%m-%dT%H-%M-%S')
+        try:
+            start_ = pd.Timestamp(year = start.year, month = start.month, day = start.day+1, hour = 7, minute=0, second=0)
+        except ValueError:
+            start_ = pd.Timestamp(year = start.year, month = start.month+1, day = 1, hour = 7, minute=0, second=0)
+        try:
+            end_ = pd.Timestamp(year = start_.year, month = start_.month, day = start_.day+1, hour = 7, minute=0, second=0)
+        except ValueError:
+            end_ = pd.Timestamp(year = start_.year, month = start_.month+1, day = 1, hour = 7, minute=0, second=0)
+        return np.array([start_,end_])
     
     def Combine_SLEAP_Data(self):
         try:
@@ -717,18 +760,6 @@ class Mouse:
         mouse_pos = pd.concat(mouse_pos, ignore_index=False)
         return mouse_pos
     
-    def Get_Active_Chunk(self):
-        start = self.mouse_pos.index[0]
-        try:
-            start_ = pd.Timestamp(year = start.year, month = start.month, day = start.day+1, hour = 7, minute=0, second=0)
-        except ValueError:
-            start_ = pd.Timestamp(year = start.year, month = start.month+1, day = 1, hour = 7, minute=0, second=0)
-        try:
-            end_ = pd.Timestamp(year = start_.year, month = start_.month, day = start_.day+1, hour = 7, minute=0, second=0)
-        except ValueError:
-            end_ = pd.Timestamp(year = start_.year, month = start_.month+1, day = 1, hour = 7, minute=0, second=0)
-        return np.array([start_,end_])
-    
     def FixNan(self, mouse_pos, column):
         mouse_pos[column] = mouse_pos[column].interpolate()
         mouse_pos[column] = mouse_pos[column].bfill()
@@ -751,7 +782,6 @@ class Mouse:
         self.mouse_pos['r'] = distance
     
     def Run_Visits(self):
-        self.arena.Get_Pellets()
         self.arena.Get_Visits()
         self.Add_Distance_to_mouse_pos()
 
@@ -781,9 +811,11 @@ class Session:
         return df, df_
 
     def Get_Filepath(self):
-        if self.aeon_exp == 'AEON3': self.file_path = "/ceph/aeon/aeon/code/scratchpad/sleap/multi_point_tracking/multi_animal_CameraTop/predictions_social02/AEON3/analyses/CameraTop_"
-        else: self.file_path = "/ceph/aeon/aeon/code/scratchpad/sleap/multi_point_tracking/multi_animal_CameraTop/predictions_social02/AEON4/analyses/CameraTop_"
-        
+        if self.aeon_exp == 'AEON3': 
+            file_path = "/ceph/aeon/aeon/code/scratchpad/sleap/multi_point_tracking/multi_animal_CameraTop/predictions_social02/AEON3/analyses/CameraTop_"
+        else: 
+            file_path = "/ceph/aeon/aeon/code/scratchpad/sleap/multi_point_tracking/multi_animal_CameraTop/predictions_social02/AEON4/analyses/CameraTop_"
+        return file_path
     def Extract_SLEAP_Data(self):
         try:
             data_x = pd.read_parquet('../SocialData/RawData/' + self.start + '_x.parquet', engine='pyarrow')
@@ -801,6 +833,7 @@ class Session:
             
             dfs_x, dfs_y = [], []
             for j in range(len(chunks)):
+                #print(self.file_path,  chunks[j])
                 file_path_ = self.file_path + chunks[j] + "_full_pose.analysis.h5"
                 with h5py.File(file_path_, 'r') as f: tracks_matrix = f['tracks'][:]
                 num_frames = tracks_matrix.shape[3]
@@ -820,6 +853,9 @@ class Session:
             data_y = pd.concat(dfs_y, ignore_index=False)
             data_x, data_y = data_x[::5],  data_y[::5]
             data_x, data_y = self.DeleteNan(data_x, data_y)
+            
+            data_x.to_parquet('../SocialData/RawData/' + self.start + '_x.parquet', engine='pyarrow')
+            data_y.to_parquet('../SocialData/RawData/' + self.start + '_y.parquet', engine='pyarrow')
         
         return data_x, data_y
 

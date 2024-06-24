@@ -18,6 +18,7 @@ current_script_path = Path(__file__).resolve()
 function_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(function_dir))
 import Functions.mouse as mouse
+import SSM.ssm as ssm
 from SSM.ssm.plots import gradient_cmap
 
 parent_dir = current_script_path.parents[2] / 'aeon_mecha' 
@@ -26,12 +27,18 @@ import aeon
 import aeon.io.api as api
 from aeon.io import reader, video
 from aeon.schema.schemas import social02
-#,
+
+''''''
+
 LABELS = [
-    ['Pre','BAA-1104045'],
-    ['Pre','BAA-1104047'],
-    ['Post','BAA-1104045'],
-    ['Post','BAA-1104047']
+    ['AEON3', 'Pre','BAA-1104045'],
+    ['AEON3', 'Pre','BAA-1104047'],
+    ['AEON3', 'Post','BAA-1104045'],
+    ['AEON3', 'Post','BAA-1104047'],
+    ['AEON4', 'Pre','BAA-1104048'], 
+    ['AEON4', 'Pre','BAA-1104049'],
+    ['AEON4', 'Post','BAA-1104048'],
+    ['AEON4', 'Post','BAA-1104049']
 ]
 nodes_name = ['nose', 'head', 'right_ear', 'left_ear', 'spine1', 'spine2','spine3', 'spine4']
 color_names = [
@@ -61,7 +68,6 @@ def Display_Body_Info(Mouse, property, nodes):
         first_frame = next(frames)
         cv2.imwrite("../Images/Social_BodyInfo/" + variable + '/frames/' + Mouse_title + '_' + value_str + '.jpg', first_frame)
 
-    
     def DrawBody(data_x, data_y, axs):
         for k in range(len(nodes_name)): 
             axs.scatter(data_x[nodes_name[k]], data_y[nodes_name[k]])
@@ -130,9 +136,6 @@ def Display_Body_Info_Characterization(Mouse, NODES, pellet_delivery = True, sta
         return modes[0]
 
     def Characterize_Timepoints(event_name, Events, left_seconds, right_seconds, file_name):
-        left_period = pd.Timedelta(str(left_seconds+1) + 'S')
-        right_period = pd.Timedelta(str(right_seconds+1) + 'S')
-        
         colors = sns.xkcd_palette(color_names[0:5])
         cmap = gradient_cmap(colors)
         CLUSTERS, VARIABLES = [], []
@@ -151,25 +154,8 @@ def Display_Body_Info_Characterization(Mouse, NODES, pellet_delivery = True, sta
             for i, val in enumerate(index): new_values[clusters == val] = i
             clusters = new_values
             mouse_pos['cluster'] = pd.Series(clusters, index = mouse_pos.index)
-
-            clusters = []
-            for i in range(len(Events)):
-                if event_name!= None: trigger = Events.iloc[i][event_name]
-                else: trigger = Events[i]
-                
-                latest_valid_index = mouse_pos.loc[trigger - left_period:trigger, 'cluster'].index
-                latest_valid_state = mouse_pos.loc[latest_valid_index, ['cluster']].values.reshape(-1)
-                if len(latest_valid_state) >= 10*left_seconds: latest_valid_state  = latest_valid_state[-10*left_seconds:]
-                
-                next_valid_index = mouse_pos.loc[trigger:trigger + right_period, 'cluster'].index
-                next_valid_state = mouse_pos.loc[next_valid_index, ['cluster']].values.reshape(-1)
-                if len(next_valid_state) >= 10*right_seconds: next_valid_state  = next_valid_state[:10*right_seconds]
-                
-                cluster = np.concatenate((latest_valid_state, np.array([np.nan]), next_valid_state))
-                
-                if len(cluster) == 10*(left_seconds + right_seconds) + 1: 
-                    clusters.append(cluster)
-                    
+            
+            clusters = Mouse.hmm.process_states.Event_Triggering(mouse_pos, Events, left_seconds, right_seconds, 'cluster')
             clusters = find_column_modes(clusters)
             CLUSTERS.append(clusters)
             VARIABLES.append(variable)
@@ -184,19 +170,21 @@ def Display_Body_Info_Characterization(Mouse, NODES, pellet_delivery = True, sta
         axs.set_yticks([])
         plt.savefig('../Images/Social_BodyInfo/' + file_name + '/' + Mouse_title + '.png')
 
-        
     Mouse_title = Mouse.type + '_' + Mouse.mouse
     mouse_pos = Mouse.mouse_pos
+    states = Mouse.hmm.states
+    N = Mouse.hmm.n_state
     
-    Mouse.Run_Visits()
     Pellets = Mouse.arena.pellets.index
-    Visits = Mouse.arena.visits
-    Entry = Mouse.arena.entry
+    Visits = Mouse.arena.visits.dropna(subset=['speed'])
+    Starts = Visits['start']
+    Ends = Visits['end']
+    Entry = Mouse.arena.entry 
     
-    if pellet_delivery: Characterize_Timepoints(event_name = None, Events = Pellets, left_seconds = 20, right_seconds = 10, file_name = 'PelletDelivery')
-    if start_visit: Characterize_Timepoints(event_name = 'start', Events = Visits, left_seconds = 20, right_seconds = 10, file_name = 'EnterVisit')
-    if end_visit: Characterize_Timepoints(event_name = 'end', Events = Visits, left_seconds = 20, right_seconds = 10, file_name = 'EndVisit')
-    if enter_arena: Characterize_Timepoints(event_name = None, Events = Entry, left_seconds = 20, right_seconds = 10, file_name = 'EnterArena')
+    if pellet_delivery: Characterize_Timepoints(event_name = 'Pellet Delivery', Events = Pellets, left_seconds = 20, right_seconds = 10, file_name = 'PelletDelivery')
+    if start_visit: Characterize_Timepoints(event_name = 'Move Wheel', Events = Starts, left_seconds = 20, right_seconds = 10, file_name = 'EnterVisit')
+    if end_visit: Characterize_Timepoints(event_name = 'End Wheel', Events = Ends, left_seconds = 20, right_seconds = 10, file_name = 'EndVisit')
+    if enter_arena: Characterize_Timepoints(event_name = 'Enter Arena', Events = Entry, left_seconds = 20, right_seconds = 10, file_name = 'EnterArena')
     print('Display_Body_Info_Characterization Completed')
 
 '''-------------------------------LDS-------------------------------'''
@@ -252,7 +240,7 @@ def Display_Kinematics_Distribution_Along_Time(Mouse, file_path):
         axs[i,3].set_ylim((0, 0.075))
         
         axs[i,0].set_ylabel(starts[i].hour)
-    plt.savefig(fie_path + Mouse_title+'.png')
+    plt.savefig(file_path + Mouse_title+'.png')
     
     print('Display_Kinematics_Distribution_Along_Time Completed')
     
@@ -264,7 +252,7 @@ def Display_Kinematics_Properties_Along_Time(Mouse, file_path):
         kurtosis = stats.kurtosis(dist)
         return mean, variance, skewness, kurtosis
 
-    Mouse_title = Mouse_title = Mouse.type + '_' + Mouse.mouse
+    Mouse_title = Mouse.type + '_' + Mouse.mouse
     mouse_pos = Mouse.mouse_pos
     start, end = mouse_pos.index[0], mouse_pos.index[-1]
     starts, ends = [],[]
@@ -327,7 +315,7 @@ def Display_Kinematics_Properties_Along_Time(Mouse, file_path):
             axs[i,j].set_xticks(N[::2], Hour[::2])
             for t in range(0,len(CR),2):
                 axs[i,j].axvspan(CR[t],CR[t+1], color='lightblue', alpha=0.5)
-    plt.savefig(title)
+    plt.savefig(file_path + Mouse_title+'.png')
     print('Display_Kinematics_Properties_Along_Time Completed')
 
 '''-------------------------------HMM-------------------------------'''   
@@ -391,7 +379,7 @@ def Display_HMM_States_Along_Time(Mouse, file_path):
     print('Display_HMM_STates_Along_Time Completed')
 
 def Display_HMM_States_Feature(Mouse, file_path):
-    def CollectData_Single(mouse_pos, N):
+    def CollectData_Single(mouse_pos):
         x, y, speed, acce, r, spine1_spine3, head_spine3, right_ear_spine3, left_ear_spine3 = [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)], [np.array([]) for _ in range(N)]
         for i in range(N):
             x[i] =  mouse_pos['smoothed_position_x'][states==i]
@@ -405,7 +393,19 @@ def Display_HMM_States_Feature(Mouse, file_path):
             left_ear_spine3[i] = mouse_pos['left_ear-spine3'][states == i]
         return x, y, speed, acce, r, spine1_spine3, head_spine3, right_ear_spine3, left_ear_spine3
 
-    def PlotPosition(N, x, y, title):
+    def PlotDuration(title):
+        inferred_state_list, inferred_durations = ssm.util.rle(states)
+        inf_durs_stacked = []
+        for s in range(N): inf_durs_stacked.append(inferred_durations[inferred_state_list == s])
+        fig = plt.figure(figsize=(8, 4))
+        plt.hist(inf_durs_stacked, label=['state ' + str(s) for s in range(N)])
+        plt.xlabel('Duration')
+        plt.ylabel('Frequency')
+        plt.legend()
+        plt.title('Histogram of Inferred State Durations')
+        plt.savefig(title)
+        
+    def PlotPosition(x, y, title):
         fig, axs = plt.subplots(1, N, figsize = (N*8-2,6))
         for i in range(N):
             axs[i].scatter(x[i], y[i], color = color_names[i], s = 2, alpha = 0.2)
@@ -416,7 +416,7 @@ def Display_HMM_States_Feature(Mouse, file_path):
             axs[i].set_ylabel('Y')
         plt.savefig(title)
     
-    def PlotFeatures(N, DATA, FEATURE, title):
+    def PlotFeatures(DATA, FEATURE, title):
         fig, axs = plt.subplots(len(FEATURE), 1, figsize = (10, len(FEATURE)*7-1))
         for data, i in zip(DATA, range(len(DATA))):
             means = [np.mean(arr) for arr in data]
@@ -432,32 +432,17 @@ def Display_HMM_States_Feature(Mouse, file_path):
     N = Mouse.hmm.n_state
     mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
 
-    x, y, speed, acce, r, spine1_spine3, head_spine3, right_ear_spine3, left_ear_spine3 = CollectData_Single(mouse_pos, N)
-    PlotPosition(N, x, y, title = file_path + 'Position/' + Mouse_title + '.png')
-    PlotFeatures(N, DATA = [speed, acce, r, spine1_spine3, head_spine3, right_ear_spine3, left_ear_spine3], FEATURE = ['SPEED', 'ACCE', 'R', 'Spine1-3', 'Head-Spine3', 'RightE-Spine3', 'LeftE-Spine3'], title = file_path + 'Feature/' + Mouse_title + '.png')
+    x, y, speed, acce, r, spine1_spine3, head_spine3, right_ear_spine3, left_ear_spine3 = CollectData_Single(mouse_pos)
+    #PlotDuration(title = file_path + 'Duration/' + Mouse_title + '.png')
+    PlotPosition(x, y, title = file_path + 'Position/' + Mouse_title + '.png')
+    PlotFeatures(DATA = [speed, acce, r, spine1_spine3, head_spine3, right_ear_spine3, left_ear_spine3], FEATURE = ['SPEED', 'ACCE', 'R', 'Spine1-3', 'Head-Spine3', 'RightE-Spine3', 'LeftE-Spine3'], title = file_path + 'Feature/' + Mouse_title + '.png')
     print('Display_HMM_States_Feature Completed')
 
-def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, start_visit = True, end_visit = True, enter_arena = True):
+def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, start_visit = True, end_visit = True, enter_arena = True, file_path = '../Images/Social_HMM/'):
     def Characterize_Timepoints(event_name, Events, left_seconds, right_seconds, file_name):
-        left_period = pd.Timedelta(str(left_seconds+1) + 'S')
-        right_period = pd.Timedelta(str(right_seconds+1) + 'S')
-        STATES = []
-        for i in range(len(Events)):
-            trigger = Events[i]
-            
-            latest_valid_index = mouse_pos.loc[trigger - left_period:trigger, 'state'].index
-            latest_valid_state = mouse_pos.loc[latest_valid_index, ['state']].values.reshape(-1)
-            if len(latest_valid_state) >= 10*left_seconds: latest_valid_state  = latest_valid_state[-10*left_seconds:]
-            
-            next_valid_index = mouse_pos.loc[trigger:trigger + right_period, 'state'].index
-            next_valid_state = mouse_pos.loc[next_valid_index, ['state']].values.reshape(-1)
-            if len(next_valid_state) >= 10*right_seconds: next_valid_state  = next_valid_state[:10*right_seconds]
-            
-            state = np.concatenate((latest_valid_state, np.array([np.nan]), next_valid_state))
-            
-            if len(state) == 10*(left_seconds + right_seconds) + 1: 
-                STATES.append(state)
-        STATES = np.array(STATES)
+        STATES = Mouse.hmm.process_states.Event_Triggering(mouse_pos, Events, left_seconds, right_seconds, 'state')
+        X = Mouse.hmm.process_states.Event_Triggering(mouse_pos, Events, left_seconds, right_seconds, 'smoothed_position_x')
+        Y = Mouse.hmm.process_states.Event_Triggering(mouse_pos, Events, left_seconds, right_seconds, 'smoothed_position_y')
         
         fig, axs = plt.subplots(1, 1, figsize=(10, 16))
         sns.heatmap(STATES,cmap=cmap, ax=axs, vmin=0, vmax = N-1, cbar = True)
@@ -466,7 +451,23 @@ def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, start_vi
         axs.set_xticklabels([event_name], rotation = 0)
         axs.set_ylabel("Events")
         axs.set_yticks([])
-        plt.savefig('../Images/Social_HMM/' + file_name + '/' + Mouse_title + '.png')
+        plt.savefig(file_path + file_name + '/' + Mouse_title + '.png')
+        
+        fig, axs = plt.subplots(1, 1, figsize=(20, 20))
+        mask = ~np.isnan(STATES[0])
+        for i in range(len(STATES)):
+            colors = np.array(color_names)[STATES[i][mask].astype(int)]
+            x = X[i][mask]
+            y = Y[i][mask]
+            dx = np.diff(x)
+            dy = np.diff(y)
+            axs.quiver(x[:-1], y[:-1], dx, dy, color=colors[:-1], 
+                    angles='xy', scale_units='xy', scale=1.1, 
+                    width=0.001, headwidth=3, headlength=3)
+        axs.set_aspect('equal')
+        axs.set_xlim((100,1400))
+        axs.set_ylim((-20,1100))
+        plt.savefig(file_path + file_name + '/' + Mouse_title + '_Position.png')
 
         AVE_STATES = []
         for k in np.arange(N):
@@ -480,7 +481,7 @@ def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, start_vi
             rgba_color = plt.cm.colors.to_rgba(color)
             for j in range(AVE_STATES.shape[1]):
                 if np.isnan(AVE_STATES[i, j]):
-                    axs.add_patch(plt.Rectangle((j, N-1-i), 0.3, 1, color=plt.cm.colors.to_rgba('black'), alpha=1, linewidth=0))
+                    axs.add_patch(plt.Rectangle((j, N-1-i), 0.2, 1, color=plt.cm.colors.to_rgba('black'), alpha=1, linewidth=0))
                 else:
                     axs.add_patch(plt.Rectangle((j, N-1-i), 1, 1, color=rgba_color, alpha=AVE_STATES[i, j], linewidth=0))
         axs.set_aspect('auto')
@@ -491,7 +492,7 @@ def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, start_vi
         axs.set_yticklabels(np.arange(N-1,-1,-1))
         axs.set_xlim(0, AVE_STATES.shape[1])
         axs.set_ylim(0, AVE_STATES.shape[0])
-        plt.savefig('../Images/Social_HMM/' + file_name + '_EachState/' + Mouse_title + '.png')
+        plt.savefig(file_path + file_name + '_EachState/' + Mouse_title + '.png')
     
     Mouse_title = Mouse.type + '_' + Mouse.mouse
     mouse_pos = Mouse.mouse_pos
@@ -527,57 +528,44 @@ def Display_HMM_States_Predicting_Behavior_Gaussian(Mouse, pellet_delivery = Tru
             characterized_state, time_shift, mean, variance = characterized_states_curve[i], time_shifts[i], means[i], variances[i]
             if time_shift < 0:
                 p[-time_shift:] = np.exp(-((characterized_state[:time_shift] - mean) ** 2) / (2 * variance ** 2))
-            else:
+            elif time_shift > 0:
                 p[:-time_shift] = np.exp(-((characterized_state[time_shift:] - mean) ** 2) / (2 * variance ** 2))
+            else:
+                p = np.exp(-((characterized_state - mean) ** 2) / (2 * variance ** 2))
             p_.append(p)
-    
+
         for p in p_: P *= p
         return P
 
     def Summarize(event_name, Events):
         mouse_pos_ = mouse_pos.copy()[Active_Chunk[0]:Active_Chunk[1]]
+        Events = Events[Events > Active_Chunk[0]]
+        Events = Events[Events < Active_Chunk[1]]
 
         COUNT_CURVES = [[] for _ in range(N)]
-        COUNT_CURVES_NAMES = []
-        for i in range(len(Events)):
-            if event_name!= None: trigger = Events.iloc[i][event_name]
-            else: trigger = Events[i]
-            
-            if trigger < Active_Chunk[0] or trigger > Active_Chunk[1]: continue
-            
-            latest_valid_index = mouse_pos_.loc[trigger - pd.Timedelta('6S'):trigger].index
-            next_valid_index = mouse_pos_.loc[trigger:trigger + pd.Timedelta('6S')].index
-            
-            for j in range(N):
-                latest_valid_state = mouse_pos_.loc[latest_valid_index, ['State' + str(j)]].values.reshape(-1)
-                if len(latest_valid_state) >= 50: latest_valid_state  = latest_valid_state[-50:]
-                next_valid_state = mouse_pos_.loc[next_valid_index, ['State' + str(j)]].values.reshape(-1)
-                if len(next_valid_state) >= 50: next_valid_state  = next_valid_state[:50]            
-                prob = np.concatenate((latest_valid_state, next_valid_state))
-                if len(prob) == 100: COUNT_CURVES[j].append(prob)
-        
         COUNT_CURVES_MAX = []
-        for i in range(N): 
-            COUNT_CURVES[i] = np.mean(np.array(COUNT_CURVES[i]), axis = 0)
+        for i in range(N):
+            count_curves = Mouse.hmm.process_states.Event_Triggering(mouse_pos_, Events, left_seconds = 5, right_seconds = 5, variable = 'State' + str(i), insert_nan = 0)
+            COUNT_CURVES[i] = np.mean(np.array(count_curves), axis = 0)
             COUNT_CURVES_MAX.append(np.max(COUNT_CURVES[i]))
-            COUNT_CURVES_NAMES.append('State' + str(i))
-        
+
         Peaks_index = np.argsort(COUNT_CURVES_MAX)
         if COUNT_CURVES_MAX[Peaks_index[-4]] > 0.4: threshold = COUNT_CURVES_MAX[Peaks_index[-4]]
         elif COUNT_CURVES_MAX[Peaks_index[-3]] < 0.4: threshold = COUNT_CURVES_MAX[Peaks_index[-3]]
         else: threshold = 0.4
         
-        characterized_states, characterized_states_names, time_shifts = [], [], []
+        characterized_states, characterized_states_peak, characterized_states_names, time_shifts = [], [], [], []
         for i in range(N):
             if np.max(COUNT_CURVES[i]) > threshold:
                 characterized_states.append(i)
+                characterized_states_peak.append(np.max(COUNT_CURVES[i]))
                 characterized_states_names.append('State'+str(i))
-                max_index = np.argsort(COUNT_CURVES[i], -1)[0]
-                time_shifts.append(max_index - 50 + 5)
-        return characterized_states, characterized_states_names, time_shifts
+                max_index = np.argsort(COUNT_CURVES[i], -1)[-1]
+                time_shifts.append(max_index - 50 + 2)
+        return characterized_states, characterized_states_peak, characterized_states_names, time_shifts
         
     def Predict(event_name, Events, file_name):
-        characterized_states, characterized_states_names, time_shifts = Summarize(event_name, Events)
+        characterized_states, characterized_states_peak, characterized_states_names, time_shifts = Summarize(event_name, Events)
         means = [1, 1,1,1,1,1, 1, 1,1,1,1,1]
         variances = [0.1, 0.1, 0.1,0.1,0.1, 0.1, 0.1, 0.1, 0.1,0.1,0.1, 0.1]
         
@@ -587,44 +575,26 @@ def Display_HMM_States_Predicting_Behavior_Gaussian(Mouse, pellet_delivery = Tru
         characterized_states_curve = []
         for i in range(len(characterized_states)):
             characterized_states_curve.append(mouse_pos.loc[mouse_pos.index, characterized_states_names[i]].to_numpy())
-        probability_curve = Calculate_Probability_Curve(characterized_states_curve, time_shifts = time_shifts, means = means, variances = variances)
+        probability_curve = Calculate_Probability_Curve(characterized_states_curve, time_shifts = time_shifts, means = characterized_states_peak, variances = variances)
         mouse_pos.loc[mouse_pos.index, 'prob'] = probability_curve
 
+        COUNT_CURVES = [[] for _ in range(len(characterized_states_curve))]
+        Events = Events[Events > Predicting_Chunk_start]
+        PROB = Mouse.hmm.process_states.Event_Triggering(mouse_pos, Events, left_seconds = 5, right_seconds = 5, variable = 'prob', insert_nan = 0)
+        for i in range(len(characterized_states_curve)):
+            COUNT_CURVES[i] = Mouse.hmm.process_states.Event_Triggering(mouse_pos, Events, left_seconds = 5, right_seconds = 5, variable = characterized_states_names[i], insert_nan = 0)
+        
         fig, axs = plt.subplots(1, 1, figsize=(10, 6))
         T = np.arange(-50, 50, 1)
-        PROB= []
-        COUNT_CURVES = [[] for _ in range(len(characterized_states_curve))]
-        for i in range(len(Events)):
-            trigger = Events[i]
-            if trigger < Predicting_Chunk_start: continue
-            
-            latest_valid_index = mouse_pos.loc[trigger - pd.Timedelta('6S'):trigger, 'prob'].index
-            next_valid_index = mouse_pos.loc[trigger:trigger + pd.Timedelta('6S'), 'prob'].index
-            
-            latest_valid_state = mouse_pos.loc[latest_valid_index, ['prob']].values.reshape(-1)
-            if len(latest_valid_state) >= 50: latest_valid_state  = latest_valid_state[-50:]
-            next_valid_state = mouse_pos.loc[next_valid_index, ['prob']].values.reshape(-1)
-            if len(next_valid_state) >= 50: next_valid_state  = next_valid_state[:50]            
-            prob = np.concatenate((latest_valid_state, next_valid_state))
-            if len(prob) == 100: PROB.append(prob)
-            
-            for j in range(len(characterized_states_curve)):
-                latest_valid_state = mouse_pos.loc[latest_valid_index, [characterized_states_names[j]]].values.reshape(-1)
-                if len(latest_valid_state) >= 50: latest_valid_state  = latest_valid_state[-50:]
-                next_valid_state = mouse_pos.loc[next_valid_index, [characterized_states_names[j]]].values.reshape(-1)
-                if len(next_valid_state) >= 50: next_valid_state  = next_valid_state[:50]            
-                prob = np.concatenate((latest_valid_state, next_valid_state))
-                if len(prob) == 100: COUNT_CURVES[j].append(prob)
-                
-        
         for i in range(len(characterized_states_curve)):
-            axs.plot(T, np.mean(np.array(COUNT_CURVES[i]), axis = 0), label = characterized_states_names[i], linestyle = '--')
+            axs.plot(T, np.mean(np.array(COUNT_CURVES[i]), axis = 0), label = characterized_states_names[i], color = color_names[int(characterized_states_names[i][-1])], linestyle = '--')
         axs.axvline(x = 0, color = 'red')
-        axs.legend()
+        axs.legend(loc = 'upper right')
         axs_ = axs.twinx()
         axs_.plot(T, np.mean(np.array(PROB), axis = 0), color = 'black', label = 'Pred.')
-        axs_.legend()
+        axs_.legend(loc = 'lower right')
         plt.savefig('../Images/Social_HMM/' + file_name + '/' + Mouse_title + '_Prediction.png')
+        
         return 'Predicton for ' + file_name + ' Completed'
     
     Mouse_title = Mouse.type + '_' + Mouse.mouse
@@ -636,8 +606,8 @@ def Display_HMM_States_Predicting_Behavior_Gaussian(Mouse, pellet_delivery = Tru
     Pellets = Mouse.arena.pellets.index
     Visits = Mouse.arena.visits
     Entry = Mouse.arena.entry 
-    Starts = Visits['start']
-    Ends = Visits['end']
+    Starts = Visits['start'].to_numpy()
+    Ends = Visits['end'].to_numpy()
 
     Active_Chunk = Mouse.active_chunk
     Predicting_Chunk_start = Active_Chunk[1] + pd.Timedelta('1S')
@@ -688,7 +658,7 @@ def Display_HMM_States_Predicting_Behavior_MLP(Mouse, pellet_delivery = True, st
         model = keras.Sequential([
             keras.layers.Dense(64, activation='relu', input_shape=input_shape),
             keras.layers.Dense(32, activation='relu'),
-            keras.layers.Dense(4, activation='softmax')
+            keras.layers.Dense(2, activation='softmax')
         ])
         model.compile(optimizer='adam',
                     loss='sparse_categorical_crossentropy',
@@ -781,45 +751,41 @@ def Display_Visit_Prediction(VISITS, model, file_path, title):
 def main():
     VISITS = []
     for label in LABELS:
-        type_name, mouse_name = label[0], label[1]
+        aeon_exp_name, type_name, mouse_name = label[0], label[1], label[2]
         print('Start Processing: ', type_name, "-", mouse_name)
         
-        Mouse = mouse.Mouse(aeon_exp='AEON3', type = type_name, mouse = mouse_name)
-        Mouse.Get_Mouse_Pos()
+        Mouse = mouse.Mouse(aeon_exp = aeon_exp_name, type = type_name, mouse = mouse_name)
+        Mouse.Run_Visits()
         
         '''-------------------------------BODY-------------------------------'''
         
-        '''NODES = [['head', 'spine3'],['spine1', 'spine3'],['left_ear', 'spine3'],['right_ear', 'spine3']]
+        NODES = [['head', 'spine3'],['spine1', 'spine3'],['left_ear', 'spine3'],['right_ear', 'spine3']]
         for nodes in NODES:
             Mouse.Add_Body_Info_to_mouse_pos(property = 'distance', nodes = nodes)
-            #Display_Body_Info(Mouse, property = 'distance', nodes = nodes)'''
-        #Mouse.Run_Visits()
-        #VISITS.append(Mouse.arena.visits)
-        '''Display_Body_Info_Characterization(Mouse, NODES,
+            #Display_Body_Info(Mouse, property = 'distance', nodes = nodes)
+        
+        Display_Body_Info_Characterization(Mouse, NODES,
                                             pellet_delivery = True,
                                             start_visit = True,
                                             end_visit = True,
-                                            enter_arena = True)'''
+                                            enter_arena = True)
 
     
         '''-------------------------------LDS-------------------------------'''
         
-        '''Display_LDS_Trace(Mouse, file_path = '../Images/Social_LDS/')'''
         
+        Display_LDS_Trace(Mouse, file_path = '../Images/Social_LDS/')
         Display_Kinematics_Distribution_Along_Time(Mouse, file_path = '../Images/Social_LDS/Distribution_')
         Display_Kinematics_Properties_Along_Time(Mouse,  file_path = '../Images/Social_LDS/Properties_')
         
         
         '''-------------------------------HMM-------------------------------'''
         #Display_Model_Selection(Mouse, N = np.arange(3, 27), file_path = '../Images/Social_HMM/StateNumber/')
-        
-        #Mouse.hmm.Fit_Model(n_state = 12, feature = 'Kinematics_and_Body')
-        '''
+
         Mouse.hmm.n_state = 20
         Mouse.hmm.feature = 'Kinematics_and_Body'
-        #Mouse.hmm.Get_TransM(n_state = 20, feature = 'Kinematics_and_Body')
+        Mouse.hmm.Get_TransM(n_state = 20, feature = 'Kinematics_and_Body')
         Mouse.hmm.Get_States()
-        Mouse.Run_Visits()
         
         Display_HMM_TransM(Mouse, file_path = '../Images/Social_HMM/TransM/')
         Display_HMM_States_Along_Time(Mouse, file_path = '../Images/Social_HMM/State/') 
@@ -828,27 +794,32 @@ def main():
                                             pellet_delivery = True,
                                             start_visit = True,
                                             end_visit = True,
-                                            enter_arena = True)
+                                            enter_arena = True,
+                                            file_path = '../Images/Social_HMM/')
+
         Display_HMM_States_Predicting_Behavior_Gaussian(Mouse,
                                                         pellet_delivery = True,
                                                         start_visit = True,
                                                         end_visit = True,
                                                         enter_arena = True)
-        Display_HMM_States_Predicting_Behavior_MLP(Mouse,
+        
+        '''Display_HMM_States_Predicting_Behavior_MLP(Mouse,
                                                     pellet_delivery = True,
                                                     start_visit = True,
                                                     end_visit = True,
                                                     enter_arena = True)'''
-        
+
         
         '''-------------------------------REGRESSION-------------------------------'''                                          
-        '''
+
         Display_Visit_Prediction(Mouse.arena.visits, model = 'linear', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'Linear_Regression.png')                                            
-        Display_Visit_Prediction(Mouse.arena.visits, model = 'MLP', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'MLP.png')''' 
-    
-    '''VISITS = pd.concat(VISITS, ignore_index=True)
+        Display_Visit_Prediction(Mouse.arena.visits, model = 'MLP', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'MLP.png')
+        
+        VISITS.append(Mouse.arena.visits)
+        
+    VISITS = pd.concat(VISITS, ignore_index=True)
     Display_Visit_Prediction(VISITS, model = 'linear', file_path = '../Images/Social_Regression/All-Mice/', title = 'Linear_Regression.png')                                            
-    Display_Visit_Prediction(VISITS, model = 'MLP', file_path = '../Images/Social_Regression/All-Mice/', title = 'MLP.png') '''
+    Display_Visit_Prediction(VISITS, model = 'MLP', file_path = '../Images/Social_Regression/All-Mice/', title = 'MLP.png')
 
 if __name__ == "__main__":
         main()
