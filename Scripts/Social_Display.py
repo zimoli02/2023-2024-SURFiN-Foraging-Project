@@ -29,18 +29,18 @@ from aeon.io import reader, video
 from aeon.schema.schemas import social02
 
 '''
-    ['AEON3', 'Pre','BAA-1104045'],
-    ['AEON3', 'Pre','BAA-1104047'],
-    ['AEON3', 'Post','BAA-1104045'],
-    ['AEON3', 'Post','BAA-1104047'],
-    ['AEON4', 'Pre','BAA-1104048'],     
+    ['AEON4', 'Pre','BAA-1104048'] 
 '''
 
 LABELS = [
-
+    ['AEON3', 'Pre','BAA-1104045'],        
+    ['AEON3', 'Pre','BAA-1104047'],
+    ['AEON3', 'Post','BAA-1104045'],     
+    ['AEON3', 'Post','BAA-1104047'], 
     ['AEON4', 'Pre','BAA-1104049'],
     ['AEON4', 'Post','BAA-1104048'],
     ['AEON4', 'Post','BAA-1104049']
+
 ]
 nodes_name = ['nose', 'head', 'right_ear', 'left_ear', 'spine1', 'spine2','spine3', 'spine4']
 color_names = [
@@ -774,7 +774,13 @@ def Display_Visit_Prediction(VISITS, model, file_path, title):
     regression.regressor = ['speed', 'acceleration', 'last_pellets_self', 'last_pellets_other','last_duration', 'last_interval','last_pellets_interval', 'entry']
     
     if model == 'linear': 
-        obs, pred = regression.Linear_Regression()
+        obs, pred, result = regression.Linear_Regression()
+        fig, axs = plt.subplots(figsize=(20, 8))
+        axs.axis('off')
+        axs.text(0.5, 0.5, str(result.summary()),
+                    verticalalignment='center', horizontalalignment='left',
+                    transform=axs.transAxes, fontsize=12)
+        plt.savefig(file_path + 'Model_' + title)
     if model == 'MLP': 
         obs, pred = regression.Multilayer_Perceptron()
     
@@ -799,12 +805,12 @@ def main():
         Mouse.Run_Visits()
         
         '''-------------------------------BODY-------------------------------'''
-        '''
+        
         NODES = [['head', 'spine3'],['spine1', 'spine3'],['left_ear', 'spine3'],['right_ear', 'spine3']]
         for nodes in NODES:
             Mouse.Add_Body_Info_to_mouse_pos(property = 'distance', nodes = nodes)
             #Display_Body_Info(Mouse, property = 'distance', nodes = nodes)
-        
+        '''
         Display_Body_Info_Characterization(Mouse, NODES,
                                             pellet_delivery = True,
                                             start_visit = True,
@@ -814,40 +820,40 @@ def main():
     
         '''-------------------------------LDS-------------------------------'''
         
-        '''
+        
         Display_LDS_Trace(Mouse, file_path = '../Images/Social_LDS/')
         Display_Kinematics_Distribution_Along_Time(Mouse, file_path = '../Images/Social_LDS/Distribution_')
         Display_Kinematics_Properties_Along_Time(Mouse,  file_path = '../Images/Social_LDS/Properties_')
-        '''
+        
         
         '''-------------------------------HMM-------------------------------'''
         #Display_Model_Selection(Mouse, N = np.arange(3, 27), file_path = '../Images/Social_HMM/StateNumber/')
         
-        '''
-        Mouse.hmm.Fit_Model(n_state = 11, feature = 'Kinematics_and_Body')
-        ''' 
+        
+        Mouse.hmm.Fit_Model(n_state = 20, feature = 'Kinematics_and_Body')
+        
         Mouse.hmm.Get_TransM(n_state = 20, feature = 'Kinematics_and_Body')
         Mouse.hmm.Get_States(n_state = 20, feature = 'Kinematics_and_Body')
         
         
-        '''
+        
         Display_HMM_TransM(Mouse, file_path = '../Images/Social_HMM/TransM/')
         Display_HMM_States_Along_Time(Mouse, file_path = '../Images/Social_HMM/State/') 
         Display_HMM_States_Feature(Mouse, file_path = '../Images/Social_HMM/')
-        '''
+        
         Display_HMM_States_Characterization(Mouse, 
                                             pellet_delivery = True,
                                             start_visit = True,
                                             end_visit = True,
                                             enter_arena = True,
                                             file_path = '../Images/Social_HMM/')
-        '''
+        
         Display_HMM_States_Predicting_Behavior_Gaussian(Mouse,
                                                         pellet_delivery = True,
                                                         start_visit = True,
                                                         end_visit = True,
                                                         enter_arena = True)
-        
+        '''
         Display_HMM_States_Predicting_Behavior_MLP(Mouse,
                                                     pellet_delivery = True,
                                                     start_visit = True,
@@ -857,14 +863,14 @@ def main():
         
         '''-------------------------------REGRESSION-------------------------------'''                                          
 
-        '''Display_Visit_Prediction(Mouse.arena.visits, model = 'linear', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'Linear_Regression.png')                                            
+        Display_Visit_Prediction(Mouse.arena.visits, model = 'linear', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'Linear_Regression.png')                                            
         Display_Visit_Prediction(Mouse.arena.visits, model = 'MLP', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'MLP.png')
         
         VISITS.append(Mouse.arena.visits)
         
     VISITS = pd.concat(VISITS, ignore_index=True)
     Display_Visit_Prediction(VISITS, model = 'linear', file_path = '../Images/Social_Regression/All-Mice/', title = 'Linear_Regression.png')                                            
-    Display_Visit_Prediction(VISITS, model = 'MLP', file_path = '../Images/Social_Regression/All-Mice/', title = 'MLP.png')'''
+    Display_Visit_Prediction(VISITS, model = 'MLP', file_path = '../Images/Social_Regression/All-Mice/', title = 'MLP.png')
 
 if __name__ == "__main__":
         main()
