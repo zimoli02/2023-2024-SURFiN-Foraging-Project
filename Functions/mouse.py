@@ -131,7 +131,17 @@ class HMM:
         state_mean_speed = self.parameters[0]
         index = np.argsort(state_mean_speed, -1) 
         self.TransM = self.model.transitions.transition_matrix[index].T[index].T
-        np.save('../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + '.npy', self.TransM)
+        
+        obs = np.array(self.mouse.mouse_pos[self.features])
+        self.loglikelihood = self.model.log_likelihood(obs)
+        self.states = self.model.most_likely_states(obs)
+
+        state_mean_speed = self.parameters[0]
+        index = np.argsort(state_mean_speed, -1)     
+
+        new_values = np.empty_like(self.states)
+        for i, val in enumerate(index): new_values[self.states == val] = i
+        self.states = new_values
     
     def Fit_Model_without_Saving(self, n_state, feature):
         self.n_state = n_state
@@ -155,27 +165,27 @@ class HMM:
         self.TransM = self.model.transitions.transition_matrix[index].T[index].T
     
     def Get_TransM(self, n_state, feature):
-        try:
-            self.TransM = np.load('../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
-        except FileNotFoundError:
-            self.Fit_Model(n_state, feature)
+        if self.TransM == None:
+            try:
+                self.TransM = np.load('../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
+                self.n_state = n_state
+                self.feature = feature
+                self.Get_Features()
+            except FileNotFoundError:
+                self.Fit_Model(n_state, feature)
+                np.save('../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + '.npy', self.TransM)
     
-    def Get_States(self):
-        try:
-            self.states = np.load('../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
-        except FileNotFoundError:
-            if self.model == None: self.Fit_Model()
-            obs = np.array(self.mouse.mouse_pos[self.features])
-            #self.loglikelihood = self.model.fit(obs, method="em", num_iters=50, init_method="kmeans")
-            self.states = self.model.most_likely_states(obs)
-
-            state_mean_speed = self.parameters[0]
-            index = np.argsort(state_mean_speed, -1)     
-
-            new_values = np.empty_like(self.states)
-            for i, val in enumerate(index): new_values[self.states == val] = i
-            self.states = new_values
-            np.save('../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", self.states)
+    def Get_States(self, n_state, feature):
+        if self.states == None:
+            try:
+                self.states = np.load('../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
+                self.n_state = n_state
+                self.feature = feature
+                self.Get_Features()
+            except FileNotFoundError:
+                if self.model == None: 
+                    self.Fit_Model(n_state, feature)
+                np.save('../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", self.states)
             
     class Process_States:
         def __init__(self, hmm):
@@ -235,16 +245,19 @@ class HMM:
             return np.array(VARIABLES)
             
 class Arena:
-    def __init__(self, mouse, origin = [709.4869937896729, 546.518087387085], radius = 511):
+    def __init__(self, mouse):
         self.mouse = mouse
         self.root = self.mouse.root
         self.start = self.mouse.mouse_pos.index[0]
         self.end = self.mouse.mouse_pos.index[-1]
+        self.metadata = self.Get_Metadata()
         self.starts = self.Get_Starts()
-        self.origin = origin
-        self.radius = radius
+        self.origin = self.Get_Origin()
+        self.radius = self.Get_Radius()
         self.entry = self.Entry()
         self.patch = ['Patch1', 'Patch2', 'Patch3']
+        self.patch_location = self.Get_Patch_Location()
+        self.patch_r = 50
 
         self.move_wheel_interval_seconds = 10
         self.pre_visit_seconds = 10
@@ -253,12 +266,33 @@ class Arena:
         self.pellets = self.Get_Pellets()
         self.visits = None
     
+    def Get_Metadata(self):
+        metadata = aeon.load(self.root, social02.Metadata, start=self.mouse.mouse_pos.index[0] - pd.Timedelta('1H'), end=self.mouse.mouse_pos.index[0] + pd.Timedelta('3D'))["metadata"].iloc[0]
+        return metadata
+    
     def Get_Starts(self):
         starts = []
         for i in range(len(self.mouse.starts)):
             start = pd.Timestamp(datetime.strptime(self.mouse.starts[i], '%Y-%m-%dT%H-%M-%S'))
             starts.append(start)
         return starts
+    
+    def Get_Origin(self):
+        origin = self.metadata.ActiveRegion.ArenaCenter
+        return [int(origin.X), int(origin.Y)]
+    
+    def Get_Radius(self):
+        r_inner = int(self.metadata.ActiveRegion.ArenaInnerRadius)
+        r_outer = int(self.metadata.ActiveRegion.ArenaOuterRadius)
+        r = (r_outer + r_inner)/2
+        return r-5
+    
+    def Get_Patch_Location(self):
+        patch_loc = {}
+        patch_loc['Patch1'] = np.mean([(int(point.X), int(point.Y)) for point in self.metadata.ActiveRegion.Patch1Region.ArrayOfPoint], axis = 0)
+        patch_loc['Patch2'] = np.mean([(int(point.X), int(point.Y)) for point in self.metadata.ActiveRegion.Patch2Region.ArrayOfPoint], axis = 0)
+        patch_loc['Patch3'] = np.mean([(int(point.X), int(point.Y)) for point in self.metadata.ActiveRegion.Patch3Region.ArrayOfPoint], axis = 0)
+        return patch_loc
     
     def Entry(self):
         mouse_pos_ = self.mouse.mouse_pos.copy()
