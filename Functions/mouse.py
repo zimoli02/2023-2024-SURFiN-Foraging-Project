@@ -76,7 +76,7 @@ class Regression:
             
         y_pred = result_valid.predict(x_test)
         
-        return y_test.to_numpy().reshape(1,-1)[0], y_pred.to_numpy()
+        return y_test.to_numpy().reshape(1,-1)[0], y_pred.to_numpy(), result_valid
 
     def Multilayer_Perceptron(self):
         self.Get_Variables()
@@ -131,6 +131,7 @@ class HMM:
         state_mean_speed = self.parameters[0]
         index = np.argsort(state_mean_speed, -1) 
         self.TransM = self.model.transitions.transition_matrix[index].T[index].T
+        np.save('../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + '.npy', self.TransM)
         
         obs = np.array(self.mouse.mouse_pos[self.features])
         self.loglikelihood = self.model.log_likelihood(obs)
@@ -142,6 +143,8 @@ class HMM:
         new_values = np.empty_like(self.states)
         for i, val in enumerate(index): new_values[self.states == val] = i
         self.states = new_values
+        np.save('../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", self.states)
+        
     
     def Fit_Model_without_Saving(self, n_state, feature):
         self.n_state = n_state
@@ -165,27 +168,24 @@ class HMM:
         self.TransM = self.model.transitions.transition_matrix[index].T[index].T
     
     def Get_TransM(self, n_state, feature):
-        if self.TransM == None:
-            try:
-                self.TransM = np.load('../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
-                self.n_state = n_state
-                self.feature = feature
-                self.Get_Features()
-            except FileNotFoundError:
-                self.Fit_Model(n_state, feature)
-                np.save('../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + '.npy', self.TransM)
+        try:
+            self.TransM = np.load('../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
+            self.n_state = n_state
+            self.feature = feature
+            self.Get_Features()
+        except FileNotFoundError:
+            self.Fit_Model(n_state, feature)
+                
     
     def Get_States(self, n_state, feature):
-        if self.states == None:
-            try:
-                self.states = np.load('../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
-                self.n_state = n_state
-                self.feature = feature
-                self.Get_Features()
-            except FileNotFoundError:
-                if self.model == None: 
-                    self.Fit_Model(n_state, feature)
-                np.save('../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", self.states)
+        try:
+            self.states = np.load('../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
+            self.n_state = n_state
+            self.feature = feature
+            self.Get_Features()
+        except FileNotFoundError:
+            self.Fit_Model(n_state, feature)
+                
             
     class Process_States:
         def __init__(self, hmm):
@@ -258,6 +258,7 @@ class Arena:
         self.patch = ['Patch1', 'Patch2', 'Patch3']
         self.patch_location = self.Get_Patch_Location()
         self.patch_r = 50
+        self.wheel_r = 30
 
         self.move_wheel_interval_seconds = 10
         self.pre_visit_seconds = 10
@@ -322,14 +323,26 @@ class Arena:
         return {'Patch1':pellets1, 'Patch2':pellets2, 'Patch3':pellets3}
         
     def Get_Pellets(self):
+        def Check_Pellet(PELLET):
+            valid_rows = []
+            for time_index in PELLET.index:
+                window_start = time_index - pd.Timedelta('0.5S')
+                window_end = time_index + pd.Timedelta('0.5S')
+                has_mouse_pos = len(self.mouse.mouse_pos[window_start:window_end]['x']) > 0
+                
+                valid_rows.append(has_mouse_pos)
+
+            return PELLET[valid_rows]
+            
         try:
             PELLET = pd.read_parquet('../SocialData/Pellets/'+ self.mouse.type + "_" + self.mouse.mouse +'_PELLET.parquet', engine='pyarrow')
         except FileNotFoundError:
             PELLET = pd.concat([self.pellets_per_patch['Patch1'],self.pellets_per_patch['Patch2'], self.pellets_per_patch['Patch3']], ignore_index=False)
+            PELLET = Check_Pellet(PELLET)
             PELLET = PELLET.sort_index()
             PELLET.to_parquet('../SocialData/Pellets/'+ self.mouse.type + "_" + self.mouse.mouse +'_PELLET.parquet', engine='pyarrow')
         return PELLET
-        print('Get_Pellets Completed')
+
     
     def Move_Wheel(self, start, end, patch):
         interval_seconds = self.move_wheel_interval_seconds
@@ -391,43 +404,50 @@ class Arena:
         return encoder
 
     def Visits_in_Patch(self, patch):
+        def Leave_Wheel(visit_end, mouse_pos_):
+            #print(visit_end)
+            patch_ox, patch_oy = self.patch_location[patch][0], self.patch_location[patch][1]
+            mouse_pos_after = mouse_pos_[visit_end:visit_end + pd.Timedelta('20S')]
+
+            distance = np.sqrt((mouse_pos_after['smoothed_position_x'] - patch_ox)**2 + (mouse_pos_after['smoothed_position_y'] - patch_oy)**2)
+            out_of_wheel = np.where(distance > self.wheel_r, 1, 0)
+            first_one_index = np.argmax(out_of_wheel)
+            return mouse_pos_after.index[first_one_index]
+            
         visits = []
         for i in range(len(self.starts)):
             if i == len(self.starts) - 1: mouse_pos_ = self.mouse.mouse_pos[self.starts[i]:]
             else: mouse_pos_ = self.mouse.mouse_pos[self.starts[i]:self.starts[i+1]]
+            
             start, end = mouse_pos_.index[0], mouse_pos_.index[-1]
             encoder = self.Move_Wheel(start, end, patch = patch)
         
             visit = {'start':[],'end':[], 'duration':[], 'speed':[], 'acceleration':[], 'entry':[], 'patch':[], 'pellet':[]}
-            
             groups = encoder['Move'].ne(encoder['Move'].shift()).cumsum()
             moves = encoder[encoder['Move'] == 1].groupby(groups)['Move']
             for name, group in moves:
-                visit_start, visit_end = group.index[0], group.index[-1] - pd.Timedelta('10S')
+                visit_start, visit_end = group.index[0], group.index[-1] - pd.Timedelta('10S') # -10S: due to the rolling function in Move_Wheel
                 if (visit_end-visit_start).total_seconds() < 0: continue
+                
+                index = self.entry.searchsorted(visit_start, side='left') - 1
+                index = max(index, 0)
+                time_from_enter_arena = (visit_start - self.entry[index]).total_seconds()
+                if time_from_enter_arena < 0: continue
+                
+                if len(mouse_pos_[visit_start: visit_end]['x']) == 0: continue
+                
                 visit['start'].append(visit_start)
-                visit['end'].append(visit_end)
+                visit['end'].append(Leave_Wheel(visit_end, mouse_pos_))
                 visit['duration'].append((visit_end-visit_start).total_seconds())
+                visit['entry'].append(time_from_enter_arena)
                 #Visits['distance'].append(encoder.loc[start, 'Distance']-encoder.loc[end, 'Distance'])
                     
                 pre_end = visit_start
                 pre_start = pre_end - pd.Timedelta(seconds = self.pre_visit_seconds)
                 if pre_start < mouse_pos_.index[0]: pre_start = mouse_pos_.index[0]
-                
-                index = self.entry.searchsorted(pre_end, side='left') - 1
-                index = max(index, 0)
-                visit['entry'].append((pre_end - self.entry[index]).total_seconds())
-                    
                 pre_visit_data = mouse_pos_.loc[pre_start:pre_end]
-                
                 visit['speed'].append(pre_visit_data['smoothed_speed'].mean())
                 visit['acceleration'].append(pre_visit_data['smoothed_acceleration'].mean())
-                '''visit['bodylength'].append(pre_visit_data['bodylength'].mean())
-                visit['bodyangle'].append(pre_visit_data['bodyangle'].mean())
-                visit['nose'].append(pre_visit_data['nose'].mean())'''
-                
-                #Visits['weight'].append(pre_visit_data['weight'].mean())
-                #Visits['state'].append(pre_visit_data['states'].value_counts().idxmax())
                 
                 visit['patch'].append(patch)
                 visit['pellet'].append(len(self.pellets_per_patch[patch][visit_start:visit_end]))
@@ -682,6 +702,7 @@ class Kinematics:
                 B=B, xnn=filterRes["xnn"], Vnn=filterRes["Vnn"],
                 xnn1=filterRes["xnn1"], Vnn1=filterRes["Vnn1"], m0=m0, V0=V0)
             np.savez_compressed('../SocialData/LDS/' + self.session.start +'_smoothRes.npz', **smoothRes) 
+            print('Inference Completed')
             
         self.filterRes = filterRes
         self.smoothRes = smoothRes
@@ -782,6 +803,8 @@ class Mouse:
                 
             data_x.to_parquet('../SocialData/BodyData/' + self.type + "_" + self.mouse + '_x.parquet', engine='pyarrow')
             data_y.to_parquet('../SocialData/BodyData/' + self.type + "_" + self.mouse + '_y.parquet', engine='pyarrow')
+            
+            print('Body Data for Mouse Completed')
         
         return data_x, data_y
         
@@ -831,6 +854,18 @@ class Session:
         self.mouse_pos = self.Get_Mouse_Pos()
         self.kinematics = Kinematics(self)
     
+    def Fix_Start(self, data_x, data_y):
+        start = data_x.index[0]
+        
+        if self.start == '2024-02-25T17-22-33': start = pd.Timestamp('2024-02-25 17:32:33.0')
+        if self.start == '2024-02-28T13-54-17': start = pd.Timestamp('2024-02-28 13:58:45.0')
+        if self.start == '2024-01-31T10-14-14': start = pd.Timestamp('2024-01-31 10:21:35.0')
+        if self.start == '2024-02-05T14-36-00': start = pd.Timestamp('2024-02-05 14:59:43.1')
+        if self.start == '2024-02-25T17-24-32': start = pd.Timestamp('2024-02-25 17:30:05.0')
+        if self.start == '2024-02-28T13-45-06': start = pd.Timestamp('2024-01-31 10:21:35.0')
+        
+        return data_x[start:], data_y[start:]
+    
     def DeleteNan(self, df, df_):
         temp_df = df.dropna(subset=['spine2'])
         first_valid_index, last_valid_index = temp_df.index[0], temp_df.index[-1]
@@ -850,6 +885,7 @@ class Session:
         else: 
             file_path = "/ceph/aeon/aeon/code/scratchpad/sleap/multi_point_tracking/multi_animal_CameraTop/predictions_social02/AEON4/analyses/CameraTop_"
         return file_path
+    
     def Extract_SLEAP_Data(self):
         try:
             data_x = pd.read_parquet('../SocialData/RawData/' + self.start + '_x.parquet', engine='pyarrow')
@@ -886,6 +922,7 @@ class Session:
             data_x = pd.concat(dfs_x, ignore_index=False)
             data_y = pd.concat(dfs_y, ignore_index=False)
             data_x, data_y = data_x[::5],  data_y[::5]
+            data_x, data_y = self.Fix_Start(data_x, data_y)
             data_x, data_y = self.DeleteNan(data_x, data_y)
             
             data_x.to_parquet('../SocialData/RawData/' + self.start + '_x.parquet', engine='pyarrow')

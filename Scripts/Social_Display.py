@@ -28,19 +28,17 @@ import aeon.io.api as api
 from aeon.io import reader, video
 from aeon.schema.schemas import social02
 
-'''
-    ['AEON4', 'Pre','BAA-1104048'] 
-'''
-
+'''   '''
+    
 LABELS = [
     ['AEON3', 'Pre','BAA-1104045'],        
     ['AEON3', 'Pre','BAA-1104047'],
     ['AEON3', 'Post','BAA-1104045'],     
     ['AEON3', 'Post','BAA-1104047'], 
+    ['AEON4', 'Pre','BAA-1104048'], 
     ['AEON4', 'Pre','BAA-1104049'],
     ['AEON4', 'Post','BAA-1104048'],
     ['AEON4', 'Post','BAA-1104049']
-
 ]
 nodes_name = ['nose', 'head', 'right_ear', 'left_ear', 'spine1', 'spine2','spine3', 'spine4']
 color_names = [
@@ -619,7 +617,7 @@ def Display_HMM_States_Predicting_Behavior_Gaussian(Mouse, pellet_delivery = Tru
         probability_curve = Calculate_Probability_Curve(characterized_states_curve, time_shifts = time_shifts, means = characterized_states_peak, variances = variances)
         mouse_pos.loc[mouse_pos.index, 'prob'] = probability_curve
 
-        COUNT_CURVES = [[] for _ in range(len(characterized_states_curve))]
+        '''COUNT_CURVES = [[] for _ in range(len(characterized_states_curve))]
         Events = Events[Events > Predicting_Chunk_start]
         PROB = Mouse.hmm.process_states.Event_Triggering(mouse_pos, Events, left_seconds = 5, right_seconds = 5, variable = 'prob', insert_nan = 0)
         for i in range(len(characterized_states_curve)):
@@ -634,7 +632,15 @@ def Display_HMM_States_Predicting_Behavior_Gaussian(Mouse, pellet_delivery = Tru
         axs_ = axs.twinx()
         axs_.plot(T, np.mean(np.array(PROB), axis = 0), color = 'black', label = 'Pred.')
         axs_.legend(loc = 'lower right')
-        plt.savefig('../Images/Social_HMM/' + file_name + '/' + Mouse_title + '_Prediction.png')
+        plt.savefig('../Images/Social_HMM/' + file_name + '/' + Mouse_title + '_Prediction.png')'''
+        
+        fig, axs = plt.subplots(1, 1, figsize=(50, 4))
+        mouse_pos_ = mouse_pos[Predicting_Chunk_start:]
+        mouse_pos_.prob.plot(ax = axs, color = 'black')
+        for i in range(len(Events)):
+            trigger = Events[i]
+            axs.axvline(x = trigger, color = 'red')
+        plt.savefig('../Images/Social_HMM/' + file_name + '/' + Mouse_title + '_Prediction_Full.png')
         
         return 'Predicton for ' + file_name + ' Completed'
     
@@ -821,23 +827,23 @@ def main():
         '''-------------------------------LDS-------------------------------'''
         
         
-        Display_LDS_Trace(Mouse, file_path = '../Images/Social_LDS/')
+        '''Display_LDS_Trace(Mouse, file_path = '../Images/Social_LDS/')
         Display_Kinematics_Distribution_Along_Time(Mouse, file_path = '../Images/Social_LDS/Distribution_')
-        Display_Kinematics_Properties_Along_Time(Mouse,  file_path = '../Images/Social_LDS/Properties_')
+        Display_Kinematics_Properties_Along_Time(Mouse,  file_path = '../Images/Social_LDS/Properties_')'''
         
         
         '''-------------------------------HMM-------------------------------'''
         #Display_Model_Selection(Mouse, N = np.arange(3, 27), file_path = '../Images/Social_HMM/StateNumber/')
         
         
-        Mouse.hmm.Fit_Model(n_state = 20, feature = 'Kinematics_and_Body')
+        #Mouse.hmm.Fit_Model(n_state = 20, feature = 'Kinematics_and_Body')
         
         Mouse.hmm.Get_TransM(n_state = 20, feature = 'Kinematics_and_Body')
         Mouse.hmm.Get_States(n_state = 20, feature = 'Kinematics_and_Body')
         
         
         
-        Display_HMM_TransM(Mouse, file_path = '../Images/Social_HMM/TransM/')
+        '''Display_HMM_TransM(Mouse, file_path = '../Images/Social_HMM/TransM/')
         Display_HMM_States_Along_Time(Mouse, file_path = '../Images/Social_HMM/State/') 
         Display_HMM_States_Feature(Mouse, file_path = '../Images/Social_HMM/')
         
@@ -846,7 +852,7 @@ def main():
                                             start_visit = True,
                                             end_visit = True,
                                             enter_arena = True,
-                                            file_path = '../Images/Social_HMM/')
+                                            file_path = '../Images/Social_HMM/')'''
         
         Display_HMM_States_Predicting_Behavior_Gaussian(Mouse,
                                                         pellet_delivery = True,
@@ -863,14 +869,14 @@ def main():
         
         '''-------------------------------REGRESSION-------------------------------'''                                          
 
-        Display_Visit_Prediction(Mouse.arena.visits, model = 'linear', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'Linear_Regression.png')                                            
+        '''Display_Visit_Prediction(Mouse.arena.visits, model = 'linear', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'Linear_Regression.png')                                            
         Display_Visit_Prediction(Mouse.arena.visits, model = 'MLP', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'MLP.png')
         
         VISITS.append(Mouse.arena.visits)
         
     VISITS = pd.concat(VISITS, ignore_index=True)
     Display_Visit_Prediction(VISITS, model = 'linear', file_path = '../Images/Social_Regression/All-Mice/', title = 'Linear_Regression.png')                                            
-    Display_Visit_Prediction(VISITS, model = 'MLP', file_path = '../Images/Social_Regression/All-Mice/', title = 'MLP.png')
+    Display_Visit_Prediction(VISITS, model = 'MLP', file_path = '../Images/Social_Regression/All-Mice/', title = 'MLP.png')'''
 
 if __name__ == "__main__":
         main()
