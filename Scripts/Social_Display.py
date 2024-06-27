@@ -10,32 +10,32 @@ from sklearn.decomposition import PCA
 from collections import Counter
 '''import tensorflow as tf
 from tensorflow import keras'''
-
 import sys
 from pathlib import Path
 current_script_path = Path(__file__).resolve()
 
-function_dir = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(function_dir))
-import Functions.mouse as mouse
-import SSM.ssm as ssm
-from SSM.ssm.plots import gradient_cmap
+functions_dir = current_script_path.parents[2] / 'Functions'
+sys.path.insert(0, str(functions_dir))
+import mouse as mouse
 
-parent_dir = current_script_path.parents[2] / 'aeon_mecha' 
-sys.path.insert(0, str(parent_dir))
+ssm_dir = current_script_path.parents[2] / 'SSM'
+sys.path.insert(0, str(ssm_dir))
+import ssm as ssm
+from ssm.plots import gradient_cmap
+
+aeon_mecha_dir = current_script_path.parents[2] / 'aeon_mecha' 
+sys.path.insert(0, str(aeon_mecha_dir))
 import aeon
 import aeon.io.api as api
 from aeon.io import reader, video
 from aeon.schema.schemas import social02
 
-'''   '''
-    
 LABELS = [
     ['AEON3', 'Pre','BAA-1104045'],        
     ['AEON3', 'Pre','BAA-1104047'],
     ['AEON3', 'Post','BAA-1104045'],     
-    ['AEON3', 'Post','BAA-1104047'], 
-    ['AEON4', 'Pre','BAA-1104048'], 
+    ['AEON3', 'Post','BAA-1104047'],   
+    ['AEON4', 'Pre','BAA-1104048'],
     ['AEON4', 'Pre','BAA-1104049'],
     ['AEON4', 'Post','BAA-1104048'],
     ['AEON4', 'Post','BAA-1104049']
@@ -322,7 +322,7 @@ def Display_Kinematics_Properties_Along_Time(Mouse, file_path):
 def Display_Model_Selection(Mouse, N, file_path):
     Mouse_title = Mouse.type + '_' + Mouse.mouse
     try:
-        Loglikelihood = np.load('../SocialData/HMMStates/Loglikelihood_' + Mouse_title + '.npy', allow_pickle=True)
+        Loglikelihood = np.load('../../SocialData/HMMStates/Loglikelihood_' + Mouse_title + '.npy', allow_pickle=True)
 
     except FileNotFoundError:
         Loglikelihood = []
@@ -617,7 +617,7 @@ def Display_HMM_States_Predicting_Behavior_Gaussian(Mouse, pellet_delivery = Tru
         probability_curve = Calculate_Probability_Curve(characterized_states_curve, time_shifts = time_shifts, means = characterized_states_peak, variances = variances)
         mouse_pos.loc[mouse_pos.index, 'prob'] = probability_curve
 
-        '''COUNT_CURVES = [[] for _ in range(len(characterized_states_curve))]
+        COUNT_CURVES = [[] for _ in range(len(characterized_states_curve))]
         Events = Events[Events > Predicting_Chunk_start]
         PROB = Mouse.hmm.process_states.Event_Triggering(mouse_pos, Events, left_seconds = 5, right_seconds = 5, variable = 'prob', insert_nan = 0)
         for i in range(len(characterized_states_curve)):
@@ -632,7 +632,7 @@ def Display_HMM_States_Predicting_Behavior_Gaussian(Mouse, pellet_delivery = Tru
         axs_ = axs.twinx()
         axs_.plot(T, np.mean(np.array(PROB), axis = 0), color = 'black', label = 'Pred.')
         axs_.legend(loc = 'lower right')
-        plt.savefig('../Images/Social_HMM/' + file_name + '/' + Mouse_title + '_Prediction.png')'''
+        plt.savefig('../Images/Social_HMM/' + file_name + '/' + Mouse_title + '_Prediction.png')
         
         fig, axs = plt.subplots(1, 1, figsize=(50, 4))
         mouse_pos_ = mouse_pos[Predicting_Chunk_start:]
@@ -827,7 +827,8 @@ def main():
         '''-------------------------------LDS-------------------------------'''
         
         
-        '''Display_LDS_Trace(Mouse, file_path = '../Images/Social_LDS/')
+        '''
+        Display_LDS_Trace(Mouse, file_path = '../Images/Social_LDS/')
         Display_Kinematics_Distribution_Along_Time(Mouse, file_path = '../Images/Social_LDS/Distribution_')
         Display_Kinematics_Properties_Along_Time(Mouse,  file_path = '../Images/Social_LDS/Properties_')'''
         
@@ -843,16 +844,17 @@ def main():
         
         
         
-        '''Display_HMM_TransM(Mouse, file_path = '../Images/Social_HMM/TransM/')
+        '''
+        Display_HMM_TransM(Mouse, file_path = '../Images/Social_HMM/TransM/')
         Display_HMM_States_Along_Time(Mouse, file_path = '../Images/Social_HMM/State/') 
-        Display_HMM_States_Feature(Mouse, file_path = '../Images/Social_HMM/')
+        Display_HMM_States_Feature(Mouse, file_path = '../Images/Social_HMM/')'''
         
         Display_HMM_States_Characterization(Mouse, 
                                             pellet_delivery = True,
                                             start_visit = True,
                                             end_visit = True,
                                             enter_arena = True,
-                                            file_path = '../Images/Social_HMM/')'''
+                                            file_path = '../Images/Social_HMM/')
         
         Display_HMM_States_Predicting_Behavior_Gaussian(Mouse,
                                                         pellet_delivery = True,
@@ -869,14 +871,15 @@ def main():
         
         '''-------------------------------REGRESSION-------------------------------'''                                          
 
-        '''Display_Visit_Prediction(Mouse.arena.visits, model = 'linear', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'Linear_Regression.png')                                            
+        Display_Visit_Prediction(Mouse.arena.visits, model = 'linear', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'Linear_Regression.png')                                            
         Display_Visit_Prediction(Mouse.arena.visits, model = 'MLP', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'MLP.png')
+        
         
         VISITS.append(Mouse.arena.visits)
         
     VISITS = pd.concat(VISITS, ignore_index=True)
     Display_Visit_Prediction(VISITS, model = 'linear', file_path = '../Images/Social_Regression/All-Mice/', title = 'Linear_Regression.png')                                            
-    Display_Visit_Prediction(VISITS, model = 'MLP', file_path = '../Images/Social_Regression/All-Mice/', title = 'MLP.png')'''
+    Display_Visit_Prediction(VISITS, model = 'MLP', file_path = '../Images/Social_Regression/All-Mice/', title = 'MLP.png')
 
 if __name__ == "__main__":
         main()
