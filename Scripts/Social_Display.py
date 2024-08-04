@@ -4,17 +4,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+
+import statsmodels.api as sm
 import scipy.stats as stats
+from scipy.special import factorial
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from collections import Counter
+
 '''import tensorflow as tf
 from tensorflow import keras'''
 import sys
 from pathlib import Path
 current_script_path = Path(__file__).resolve()
 
-functions_dir = current_script_path.parents[2] / 'Functions'
+functions_dir = current_script_path.parents[1] / 'Functions'
 sys.path.insert(0, str(functions_dir))
 import mouse as mouse
 
@@ -40,6 +44,7 @@ LABELS = [
     ['AEON4', 'Post','BAA-1104048'],
     ['AEON4', 'Post','BAA-1104049']
 ]
+
 nodes_name = ['nose', 'head', 'right_ear', 'left_ear', 'spine1', 'spine2','spine3', 'spine4']
 color_names = [
     'black', 'blue', 'red', 'tan', 'green', 'brown', 
@@ -676,6 +681,102 @@ def Display_HMM_States_Predicting_Behavior_Gaussian(Mouse, pellet_delivery = Tru
     
     print('Display_HMM_States_Predicting_Behavior_Gaussian Completed')
 
+def Display_HMM_States_Predicting_Behavior_Poisson(Mouse, pellet_delivery = True, start_visit = True, end_visit = True, enter_arena = True):
+    
+    Mouse_title = Mouse.type + '_' + Mouse.mouse
+    mouse_pos = Mouse.mouse_pos
+    N = Mouse.hmm.n_state
+    states = Mouse.hmm.states
+    mouse_pos['state'] = pd.Series(states, index = mouse_pos.index)
+
+    Pellets = Mouse.arena.pellets.index
+    Entry = Mouse.arena.entry 
+    Starts = Mouse.arena.visits['start'].to_numpy()
+    Ends = Mouse.arena.visits['end'].to_numpy()
+
+    Active_Chunk = Mouse.active_chunk
+    Predicting_Chunk = [Active_Chunk[1] + pd.Timedelta('1S') + pd.Timedelta('2H'), Active_Chunk[1] + pd.Timedelta('1S') + pd.Timedelta('9H')]
+    
+    mouse_pos = Mouse.hmm.process_states.State_Timewindow(mouse_pos, timewindow = 60)
+    
+    def Shuffle(regression, prediction):            
+        Ls = []
+        for i in range(1000):
+            regression.X = regression.X.apply(lambda x: np.random.permutation(x))
+            
+            model = sm.GLM(regression.Y, regression.X, family=sm.families.Poisson(sm.families.links.Log()))
+            result = model.fit_regularized(alpha=0.01, L1_wt=1.0, maxiter = 1000)
+            y_pred = result.predict(prediction.X)
+            y, y_pred = prediction.Y.to_numpy().reshape(1,-1)[0], y_pred.to_numpy()
+                
+            epsilon = 1e-10
+            y_pred = np.where(y_pred <= 0, epsilon, y_pred)
+
+            Ls.append(np.mean(y * np.log(y_pred) - y_pred - np.log(factorial(y))))
+        return Ls
+    
+    def Predict(event_name, Events, file_name):
+        mouse_pos_ = mouse_pos.copy()
+        mouse_pos_[file_name] = 0
+        nearest_indices = mouse_pos_.index.get_indexer(Events, method='nearest')
+        mouse_pos_.iloc[nearest_indices, mouse_pos_.columns.get_loc(file_name)] = 1
+
+        window_size = 600 #60seconds/0.1
+        mouse_pos_['intensity'] = mouse_pos_[file_name].rolling(window=window_size, min_periods=1).sum()
+    
+        mouse_pos_train = mouse_pos_[Active_Chunk[0]:Active_Chunk[1]][::window_size]
+        mouse_pos_test = mouse_pos_[Predicting_Chunk[0]:Predicting_Chunk[1]][::window_size]
+        
+        regression = mouse.Regression(mouse_pos_train)
+        regression.predictor = 'intensity'
+        regression.regressor = []
+        for i in range(N): regression.regressor.append('State' + str(i))
+        result = regression.Poisson()
+        print(result.params)
+        
+        prediction = mouse.Regression(mouse_pos_test)
+        prediction.predictor = 'intensity'
+        prediction.regressor = regression.regressor 
+        prediction.Get_Variables()
+        y_pred = result.predict(prediction.X)
+        y, y_pred = prediction.Y.to_numpy().reshape(1,-1)[0], y_pred.to_numpy()
+            
+        epsilon = 1e-10
+        y_pred = np.where(y_pred <= 0, epsilon, y_pred)
+
+        L = np.mean(y * np.log(y_pred) - y_pred - np.log(factorial(y)))
+        Ls = Shuffle(regression, prediction)
+        mouse_pos_test.loc[mouse_pos_test.index, 'intensity_pred'] = y_pred
+        
+        fig, axs = plt.subplots(1, 1, figsize=(50, 6), sharex=True)
+        mouse_pos_test.intensity.plot(ax = axs, color = 'red', label = 'True Intensity')
+        axs.legend(fontsize='large')
+        axs_ = axs.twinx()
+        mouse_pos_test.intensity_pred.plot(ax = axs_, color = 'black', label = 'Predicted Intensity: Ave Log-Likelihood = ' + str(round(L, 3)))
+        axs_.legend(fontsize='large')
+        plt.savefig('../Images/Social_HMM_Prediction/' + file_name + '/' + Mouse_title + '.png')
+        
+        t_stat, p_value = stats.ttest_1samp(Ls, L)
+        fig, axs = plt.subplots(1, 1, figsize=(6, 6))
+        axs.hist(Ls, bins = 20, color = 'blue', alpha = 0.8)
+        axs.axvline(x=L, color = 'red', label = 'p-value: ' + str(round(p_value,3)))
+        axs.legend(fontsize='medium')
+        plt.savefig('../Images/Social_HMM_Prediction/' + file_name + '/' + Mouse_title + '_Validation.png')
+        
+        print('Predicton for ' + file_name + ' Completed') 
+    
+    if pellet_delivery: 
+        Predict(event_name = 'Pellet Delivery', Events = Pellets, file_name = 'PelletDelivery')
+    if start_visit: 
+        Predict(event_name = 'Move Wheel', Events = Starts, file_name = 'EnterVisit')
+    if end_visit: 
+        Predict(event_name = 'Leave Wheel', Events = Ends, file_name = 'EndVisit')
+    if enter_arena: 
+        Predict(event_name = 'Enter Arena', Events = Entry, file_name = 'EnterArena')
+    
+    print('Display_HMM_States_Predicting_Behavior_Poisson Completed')
+
+
 def Display_HMM_States_Predicting_Behavior_MLP(Mouse, pellet_delivery = True, start_visit = True, end_visit = True, enter_arena = True):
     def Train(Events, input_length):
         mouse_pos_ = mouse_pos.copy()[Active_Chunk[0]:Active_Chunk[1]]
@@ -770,7 +871,7 @@ def Display_HMM_States_Predicting_Behavior_MLP(Mouse, pellet_delivery = True, st
         print(result)
     if enter_arena: 
         result = Predict(event_name = 'Enter Arena', Events = Entry, input_length = 30, file_name = 'EnterArena')
-        print(result)
+        print(result) 
     
     print('Display_HMM_States_Predicting_Behavior_MLP Completed')
 
@@ -837,17 +938,14 @@ def main():
         #Display_Model_Selection(Mouse, N = np.arange(3, 27), file_path = '../Images/Social_HMM/StateNumber/')
         
         
-        #Mouse.hmm.Fit_Model(n_state = 20, feature = 'Kinematics_and_Body')
+        Mouse.hmm.Fit_Model(n_state = 10, feature = 'Kinematics_and_Body')
         
-        Mouse.hmm.Get_TransM(n_state = 20, feature = 'Kinematics_and_Body')
-        Mouse.hmm.Get_States(n_state = 20, feature = 'Kinematics_and_Body')
+        Mouse.hmm.Get_TransM(n_state = 10, feature = 'Kinematics_and_Body')
+        Mouse.hmm.Get_States(n_state = 10, feature = 'Kinematics_and_Body')
         
-        
-        
-        '''
         Display_HMM_TransM(Mouse, file_path = '../Images/Social_HMM/TransM/')
         Display_HMM_States_Along_Time(Mouse, file_path = '../Images/Social_HMM/State/') 
-        Display_HMM_States_Feature(Mouse, file_path = '../Images/Social_HMM/')'''
+        Display_HMM_States_Feature(Mouse, file_path = '../Images/Social_HMM/')
         
         Display_HMM_States_Characterization(Mouse, 
                                             pellet_delivery = True,
@@ -855,23 +953,28 @@ def main():
                                             end_visit = True,
                                             enter_arena = True,
                                             file_path = '../Images/Social_HMM/')
-        
+        '''
         Display_HMM_States_Predicting_Behavior_Gaussian(Mouse,
                                                         pellet_delivery = True,
                                                         start_visit = True,
                                                         end_visit = True,
                                                         enter_arena = True)
-        '''
+        
         Display_HMM_States_Predicting_Behavior_MLP(Mouse,
                                                     pellet_delivery = True,
                                                     start_visit = True,
                                                     end_visit = True,
                                                     enter_arena = True)'''
 
+        Display_HMM_States_Predicting_Behavior_Poisson(Mouse,
+                                                        pellet_delivery = True,
+                                                        start_visit = True,
+                                                        end_visit = True,
+                                                        enter_arena = True)
         
         '''-------------------------------REGRESSION-------------------------------'''                                          
 
-        Display_Visit_Prediction(Mouse.arena.visits, model = 'linear', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'Linear_Regression.png')                                            
+        '''Display_Visit_Prediction(Mouse.arena.visits, model = 'linear', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'Linear_Regression.png')                                            
         Display_Visit_Prediction(Mouse.arena.visits, model = 'MLP', file_path = '../Images/Social_Regression/'+Mouse.type+'-'+Mouse.mouse+'/', title = 'MLP.png')
         
         
@@ -879,7 +982,7 @@ def main():
         
     VISITS = pd.concat(VISITS, ignore_index=True)
     Display_Visit_Prediction(VISITS, model = 'linear', file_path = '../Images/Social_Regression/All-Mice/', title = 'Linear_Regression.png')                                            
-    Display_Visit_Prediction(VISITS, model = 'MLP', file_path = '../Images/Social_Regression/All-Mice/', title = 'MLP.png')
+    Display_Visit_Prediction(VISITS, model = 'MLP', file_path = '../Images/Social_Regression/All-Mice/', title = 'MLP.png')'''
 
 if __name__ == "__main__":
         main()
