@@ -35,7 +35,11 @@ from aeon.io import reader, video
 from aeon.schema.schemas import social02
 
 LABELS = [
-    ['AEON3', 'Pre','BAA-1104045'],        
+    ['AEON3', 'Pre','BAA-1104045']
+]
+
+'''
+,        
     ['AEON3', 'Pre','BAA-1104047'],
     ['AEON3', 'Post','BAA-1104045'],     
     ['AEON3', 'Post','BAA-1104047'],   
@@ -43,12 +47,12 @@ LABELS = [
     ['AEON4', 'Pre','BAA-1104049'],
     ['AEON4', 'Post','BAA-1104048'],
     ['AEON4', 'Post','BAA-1104049']
-]
+'''
 
 nodes_name = ['nose', 'head', 'right_ear', 'left_ear', 'spine1', 'spine2','spine3', 'spine4']
 color_names = [
     'black', 'blue', 'red', 'tan', 'green', 'brown', 
-    'purple', 'orange', 'turquoise', 'yellow', 'pink', 
+    'purple', 'orange', 'magenta', 'olive', 'pink', 
     'darkblue', 'lime', 'cyan', 'magenta', 'gold', 
     'navy', 'maroon', 'teal', 'grey'
 ]
@@ -337,27 +341,42 @@ def Display_Model_Selection(Mouse, N, file_path):
             print('End Inference for n = ', str(n))
         Loglikelihood = np.array(Loglikelihood)
         np.save('../SocialData/HMMStates/Loglikelihood_' + Mouse_title + '.npy', Loglikelihood)
-        
-    fig, axs = plt.subplots(1,1,figsize = (10,7))
-    axs.scatter(N, Loglikelihood)
-    axs.plot(N, Loglikelihood, color = 'black')
-    axs.set_xticks(N)
-    plt.savefig(file_path + Mouse_title + '.png')
     
+    points = 24*60*60*10 
+    Loglikelihood = Loglikelihood/points
     df = Loglikelihood[1:] - Loglikelihood[:-1]
-    fig, axs = plt.subplots(1,1,figsize = (10,7))
-    axs.scatter(N[1:], df)
-    axs.plot(N[1:], df, color = 'black')
-    axs.set_xticks(N[1:])
-    plt.savefig(file_path + Mouse_title + '_df.png')
+    
+    fig, axs = plt.subplots(1,2,figsize = (20,8))
+    axs[0].scatter(N, Loglikelihood)
+    axs[0].plot(N, Loglikelihood)
+    axs[0].set_xticks(N)
+    axs[1].scatter(N[1:], df)
+    axs[1].plot(N[1:], df)
+    axs[1].set_xticks(N[1:])
+    for i in range(2):
+        axs[i].axvline(x=10, color = 'red', linestyle = "--")
+        axs[i].set_xlabel('State Number', fontsize = 20)
+        axs[i].tick_params(axis='both', which='major', labelsize=12)
+        axs[i].spines['top'].set_visible(False)
+        axs[i].spines['right'].set_visible(False)
+    axs[0].set_ylabel('Log Likelihood per Point', fontsize = 20)
+    axs[1].set_ylabel('$\Delta$Log Likelihood per Point', fontsize = 20)
+    plt.tight_layout()
+
 
 def Display_HMM_TransM(Mouse, file_path):
     Mouse_title = Mouse.type + '_' + Mouse.mouse
     TransM = Mouse.hmm.TransM
     annot_array = np.array([[round(item, 3) for item in row] for row in TransM])
-    fig, axs = plt.subplots(1,1, figsize=(len(TransM)+3, len(TransM)+3))
-    sns.heatmap(TransM, cmap='binary', ax = axs, square = 'True', cbar = False, annot=annot_array)
-    axs.set_title("Learned Transition Matrix") 
+    labels = ['$S_{' + str(i+1) + '}$' for i in range(len(TransM))]
+    
+    fig, axs = plt.subplots(1,1, figsize=(10,8))
+    sns.heatmap(TransM, cmap='RdBu', ax = axs, square = 'True', cbar = True, annot=annot_array, annot_kws={'size': 14})
+    axs.set_title("Transition Matrix", fontsize = 20)
+    axs.set_xticklabels(labels)
+    axs.set_yticklabels(labels, rotation = 0)
+    axs.tick_params(axis='both', which='major', labelsize=12)
+    plt.tight_layout()
     plt.savefig( file_path + Mouse_title + '.png')
     print('Display_HMM_TransM Completed')
 
@@ -410,18 +429,6 @@ def Display_HMM_States_Feature(Mouse, file_path):
             right_ear_spine3[i] = mouse_pos['right_ear-spine3'][states == i]
             left_ear_spine3[i] = mouse_pos['left_ear-spine3'][states == i]
         return x, y, speed, acce, r, spine1_spine3, head_spine3, right_ear_spine3, left_ear_spine3
-
-    def PlotDuration(title):
-        inferred_state_list, inferred_durations = ssm.util.rle(states)
-        inf_durs_stacked = []
-        for s in range(N): inf_durs_stacked.append(inferred_durations[inferred_state_list == s])
-        fig = plt.figure(figsize=(8, 4))
-        plt.hist(inf_durs_stacked, label=['state ' + str(s) for s in range(N)])
-        plt.xlabel('Duration')
-        plt.ylabel('Frequency')
-        plt.legend()
-        plt.title('Histogram of Inferred State Durations')
-        plt.savefig(title)
         
     def PlotPosition(x, y, title):
         fig, axs = plt.subplots(1, N, figsize = (N*8-2,6))
@@ -429,19 +436,25 @@ def Display_HMM_States_Feature(Mouse, file_path):
             axs[i].scatter(x[i], y[i], color = color_names[i], s = 2, alpha = 0.2)
             axs[i].set_xlim((100,1400))
             axs[i].set_ylim((-20,1100))
-            axs[i].set_title('State' + str(i))
+            axs[i].set_title('State' + str(i+1))
             axs[i].set_xlabel('X')
             axs[i].set_ylabel('Y')
+        #plt.tight_layout()
         plt.savefig(title)
     
     def PlotFeatures(DATA, FEATURE, title):
-        fig, axs = plt.subplots(len(FEATURE), 1, figsize = (10, len(FEATURE)*7-1))
+        fig, axs = plt.subplots(len(DATA), 1, figsize = (10, len(DATA)*7-1))
         for data, i in zip(DATA, range(len(DATA))):
             means = [np.mean(arr) for arr in data]
             var = [np.std(arr)/np.sqrt(len(arr)) for arr in data]
             axs[i].bar(range(N), means, yerr=var, capsize=5)
-            axs[i].set_xticks(range(0, N), [str(j) for j in range(N)])
-            axs[i].set_ylabel(FEATURE[i])
+            axs[i].set_xticks(range(0, N), [str(j+1) for j in range(N)])
+            axs[i].set_ylabel(FEATURE[i], fontsize = 20)
+            axs[i].spines['top'].set_visible(False)
+            axs[i].spines['right'].set_visible(False)
+            axs[i].tick_params(axis='both', which='major', labelsize=14)
+        axs[len(DATA)-1].set_xlabel('State', fontsize = 20)
+        plt.tight_layout()
         plt.savefig(title)
     
     Mouse_title = Mouse.type + '_' + Mouse.mouse
@@ -453,7 +466,7 @@ def Display_HMM_States_Feature(Mouse, file_path):
     x, y, speed, acce, r, spine1_spine3, head_spine3, right_ear_spine3, left_ear_spine3 = CollectData_Single(mouse_pos)
     #PlotDuration(title = file_path + 'Duration/' + Mouse_title + '.png')
     PlotPosition(x, y, title = file_path + 'Position/' + Mouse_title + '.png')
-    PlotFeatures(DATA = [speed, acce, r, spine1_spine3, head_spine3, right_ear_spine3, left_ear_spine3], FEATURE = ['SPEED', 'ACCE', 'R', 'Spine1-3', 'Head-Spine3', 'RightE-Spine3', 'LeftE-Spine3'], title = file_path + 'Feature/' + Mouse_title + '.png')
+    PlotFeatures(DATA = [speed, acce, head_spine3], FEATURE = ['SPEED', 'ACCE', 'Head-Spine3'], title = file_path + 'Feature/' + Mouse_title + '.png')
     print('Display_HMM_States_Feature Completed')
 
 def Display_HMM_States_Characterization(Mouse, pellet_delivery = False, start_visit = True, end_visit = True, enter_arena = True, file_path = '../Images/Social_HMM/'):
@@ -716,16 +729,21 @@ def Display_HMM_States_Predicting_Behavior_Poisson(Mouse, pellet_delivery = True
         return Ls
     
     def Predict(event_name, Events, file_name):
-        mouse_pos_ = mouse_pos.copy()
+        mouse_pos_ = mouse_pos.copy()[::100] # dt = 10s
+        print(mouse_pos_.index[1] - mouse_pos_.index[0])
+        
         mouse_pos_[file_name] = 0
         nearest_indices = mouse_pos_.index.get_indexer(Events, method='nearest')
-        mouse_pos_.iloc[nearest_indices, mouse_pos_.columns.get_loc(file_name)] = 1
-
-        window_size = 600 #60seconds/0.1
-        mouse_pos_['intensity'] = mouse_pos_[file_name].rolling(window=window_size, min_periods=1).sum()
+        for i in range(len(nearest_indices)):
+            mouse_pos_.iloc[nearest_indices[i], mouse_pos_.columns.get_loc(file_name)] += 1
+        print('Locate events')
+        
+        time_period = 6 # 60s
+        mouse_pos_.loc[mouse_pos_.index, 'intensity'] = mouse_pos_[file_name].rolling(window=time_period, min_periods=1).sum()
+        print('Cauculate intensity')
     
-        mouse_pos_train = mouse_pos_[Active_Chunk[0]:Active_Chunk[1]][::window_size]
-        mouse_pos_test = mouse_pos_[Predicting_Chunk[0]:Predicting_Chunk[1]][::window_size]
+        mouse_pos_train = mouse_pos_[Active_Chunk[0]:Active_Chunk[1]]
+        mouse_pos_test = mouse_pos_[Predicting_Chunk[0]:Predicting_Chunk[1]]
         
         regression = mouse.Regression(mouse_pos_train)
         regression.predictor = 'intensity'
@@ -740,28 +758,46 @@ def Display_HMM_States_Predicting_Behavior_Poisson(Mouse, pellet_delivery = True
         prediction.Get_Variables()
         y_pred = result.predict(prediction.X)
         y, y_pred = prediction.Y.to_numpy().reshape(1,-1)[0], y_pred.to_numpy()
+        print('prediction')
             
         epsilon = 1e-10
         y_pred = np.where(y_pred <= 0, epsilon, y_pred)
-
         L = np.mean(y * np.log(y_pred) - y_pred - np.log(factorial(y)))
-        Ls = Shuffle(regression, prediction)
         mouse_pos_test.loc[mouse_pos_test.index, 'intensity_pred'] = y_pred
         
-        fig, axs = plt.subplots(1, 1, figsize=(50, 6), sharex=True)
-        mouse_pos_test.intensity.plot(ax = axs, color = 'red', label = 'True Intensity')
-        axs.legend(fontsize='large')
-        axs_ = axs.twinx()
-        mouse_pos_test.intensity_pred.plot(ax = axs_, color = 'black', label = 'Predicted Intensity: Ave Log-Likelihood = ' + str(round(L, 3)))
-        axs_.legend(fontsize='large')
-        plt.savefig('../Images/Social_HMM_Prediction/' + file_name + '/' + Mouse_title + '.png')
+        fig, axs = plt.subplots(1, 1, figsize=(50, 8), sharex=True)
+        mouse_pos_test.intensity.plot(ax = axs, color = 'red', linewidth = 2.5, label = 'Observed')
+        axs.set_ylabel('$\lambda(t)$', fontsize = 20)
+        axs.legend(fontsize=20, loc = 'upper left')
+        axs.tick_params(axis='both', which='major', labelsize=16)
+        axs.spines['top'].set_visible(False)
+        x_min, x_max = axs.get_xlim()
+        axs.set_xlim(left=x_min, right=x_max)
         
+        axs_ = axs.twinx()
+        mouse_pos_test.intensity_pred.plot(ax = axs_, color = 'black', label = 'Predicted: Ave Log-Likelihood = ' + str(round(L, 3)))
+        axs_.set_ylabel('$\hat{\lambda}(t)$', fontsize = 20)
+        axs_.legend(fontsize=20, loc = 'upper right')
+        axs_.tick_params(axis='both', which='major', labelsize=16)
+        axs_.spines['top'].set_visible(False)
+        axs_.set_xlim(left=x_min, right=x_max)
+        
+        plt.tight_layout()
+        plt.savefig('../Images/Social_HMM_Prediction/' + file_name + '/' + Mouse_title + '.png')
+        print('plot')
+        
+        '''Ls = Shuffle(regression, prediction)
         t_stat, p_value = stats.ttest_1samp(Ls, L)
-        fig, axs = plt.subplots(1, 1, figsize=(6, 6))
+        fig, axs = plt.subplots(1, 1, figsize=(6, 8))
         axs.hist(Ls, bins = 20, color = 'blue', alpha = 0.8)
         axs.axvline(x=L, color = 'red', label = 'p-value: ' + str(round(p_value,3)))
-        axs.legend(fontsize='medium')
+        axs.legend(fontsize = 16, loc = 'upper left')
+        axs.tick_params(axis='both', which='major', labelsize=12)
+        axs.spines['top'].set_visible(False)
+        axs.spines['right'].set_visible(False)
+        plt.tight_layout()
         plt.savefig('../Images/Social_HMM_Prediction/' + file_name + '/' + Mouse_title + '_Validation.png')
+        print('Shuffle')'''
         
         print('Predicton for ' + file_name + ' Completed') 
     
@@ -940,6 +976,7 @@ def main():
         
         Mouse.hmm.Fit_Model(n_state = 10, feature = 'Kinematics_and_Body')
         
+        
         Mouse.hmm.Get_TransM(n_state = 10, feature = 'Kinematics_and_Body')
         Mouse.hmm.Get_States(n_state = 10, feature = 'Kinematics_and_Body')
         
@@ -953,6 +990,7 @@ def main():
                                             end_visit = True,
                                             enter_arena = True,
                                             file_path = '../Images/Social_HMM/')
+        
         '''
         Display_HMM_States_Predicting_Behavior_Gaussian(Mouse,
                                                         pellet_delivery = True,
@@ -964,13 +1002,13 @@ def main():
                                                     pellet_delivery = True,
                                                     start_visit = True,
                                                     end_visit = True,
-                                                    enter_arena = True)'''
-
+                                                    enter_arena = True)
+        '''
         Display_HMM_States_Predicting_Behavior_Poisson(Mouse,
                                                         pellet_delivery = True,
                                                         start_visit = True,
-                                                        end_visit = True,
-                                                        enter_arena = True)
+                                                        end_visit = False,
+                                                        enter_arena = False)
         
         '''-------------------------------REGRESSION-------------------------------'''                                          
 

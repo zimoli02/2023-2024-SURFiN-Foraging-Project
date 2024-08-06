@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import pandas as pd
+from scipy.special import factorial
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import statsmodels.api as sm
@@ -8,28 +9,29 @@ from collections import Counter
 import h5py
 from datetime import datetime, timedelta
 import torch
-import tensorflow as tf
-from tensorflow import keras
+'''import tensorflow as tf
+from tensorflow import keras'''
 
 
 import sys
 from pathlib import Path
 current_script_path = Path(__file__).resolve()
 
-functions_dir = current_script_path.parents[2] / 'Functions'
+functions_dir = current_script_path.parents[0] / 'Functions'
 sys.path.insert(0, str(functions_dir))
 import learning
 import inference
 
 ssm_dir = current_script_path.parents[2] / 'SSM'
 sys.path.insert(0, str(ssm_dir))
-import ssm
+import ssm as ssm
 
 aeon_mecha_dir = current_script_path.parents[2] / 'aeon_mecha' 
 sys.path.insert(0, str(aeon_mecha_dir))
 import aeon
 import aeon.io.api as api
 from aeon.io import reader, video
+from aeon.schema.schemas import social02
 from aeon.schema.dataset import exp02
 from aeon.schema.schemas import social02
 from aeon.analysis.utils import visits, distancetravelled
@@ -49,9 +51,43 @@ class Regression:
         self.X = self.visits[self.regressor]
         #scaler = StandardScaler()
         #self.X = pd.DataFrame(scaler.fit_transform(X), index = X.index, columns = X.columns)
-        self.X['interc'] = 1
+        #self.X.loc[:, 'interc'] = np.ones(len(self.X))
         self.Y = self.visits[[self.predictor]]
+    
+    def Poisson(self):
+        self.Get_Variables()
+        '''model = sm.GLM(self.Y, self.X, family=sm.families.Poisson(sm.families.links.Log()))
+        result = model.fit()'''
         
+        split_size = int(len(self.Y) * self.split_perc)
+        indices = np.arange(len(self.Y))
+        
+        L_max = -1e10
+        for i in range(100):
+            np.random.shuffle(indices)
+            
+            train_indices = indices[:split_size]
+            test_indices = indices[split_size:]
+
+            X_train, X_test = self.X.iloc[train_indices], self.X.iloc[test_indices]
+            Y_train, Y_test = self.Y.iloc[train_indices], self.Y.iloc[test_indices]
+            
+            model = sm.GLM(Y_train, X_train, family=sm.families.Poisson(sm.families.links.Log()))
+            result = model.fit_regularized(alpha=0.01, L1_wt=1.0, maxiter = 1000)
+            Y_test_pred = result.predict(X_test)
+            Y_test, Y_test_pred = Y_test.to_numpy().reshape(1,-1)[0], Y_test_pred.to_numpy()
+            
+            epsilon = 1e-10
+            Y_test_pred = np.where(Y_test_pred <= 0, epsilon, Y_test_pred)
+
+            L = np.mean(Y_test * np.log(Y_test_pred) - Y_test_pred - np.log(factorial(Y_test)))
+            #D = 2 * np.sum(Y_test * np.log(Y_test / Y_test_pred) - (Y_test - Y_test_pred))
+            if L > L_max:  
+                result_valid = result
+                L_max = L
+        
+        return result_valid
+    
     def Linear_Regression(self):
         self.Get_Variables()
         split_size = int(len(self.Y) * self.split_perc)
@@ -81,6 +117,7 @@ class Regression:
         
         return y_test.to_numpy().reshape(1,-1)[0], y_pred.to_numpy(), result_valid
 
+    '''    
     def Multilayer_Perceptron(self):
         self.Get_Variables()
         self.X = self.X.to_numpy().astype(np.float32)
@@ -101,6 +138,7 @@ class Regression:
         model.fit(self.X[:mid_point], self.Y[:mid_point], epochs=100, batch_size=32)
         predictions = model.predict(self.X[mid_point:])
         return self.Y[mid_point:], predictions
+        '''
     
 class HMM:
     def __init__(self, mouse):
@@ -133,16 +171,16 @@ class HMM:
         
         state_mean_speed = self.parameters[0]
         index = np.argsort(state_mean_speed, -1) 
+        
+        self.parameters = self.parameters.T[index].T
+        np.save('../../SocialData/HMMStates/Params_' + self.mouse.type + "_" + self.mouse.mouse + '.npy', self.parameters)
         self.TransM = self.model.transitions.transition_matrix[index].T[index].T
         np.save('../../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + '.npy', self.TransM)
         
         obs = np.array(self.mouse.mouse_pos[self.features])
         self.loglikelihood = self.model.log_likelihood(obs)
         self.states = self.model.most_likely_states(obs)
-
-        state_mean_speed = self.parameters[0]
-        index = np.argsort(state_mean_speed, -1)     
-
+        
         new_values = np.empty_like(self.states)
         for i, val in enumerate(index): new_values[self.states == val] = i
         self.states = new_values
@@ -844,6 +882,8 @@ class Mouse:
             session.Add_Kinematics(self)
             mouse_pos.append(session.mouse_pos)
         mouse_pos = pd.concat(mouse_pos, ignore_index=False)
+        mouse_pos = mouse_pos[mouse_pos['smoothed_speed']<2000]
+        mouse_pos = mouse_pos[mouse_pos['smoothed_acceleration']<8000]
         return mouse_pos
     
     def FixNan(self, mouse_pos, column):
@@ -980,6 +1020,19 @@ class Session:
         x_acc, y_acc = smoothRes['xnN'][2][0], smoothRes['xnN'][5][0]
         acc = np.sqrt(x_acc**2 + y_acc**2)
         self.mouse_pos['smoothed_acceleration'] = pd.Series(acc, index=self.mouse_pos.index)
+        
+
+        self.mouse_pos['smoothed_velocity_x'] = pd.Series(smoothRes['xnN'][1][0], index=self.mouse_pos.index)
+        self.mouse_pos['smoothed_velocity_y'] = pd.Series(smoothRes['xnN'][4][0], index=self.mouse_pos.index)
+        self.mouse_pos['smoothed_acceleration_x'] = pd.Series(smoothRes['xnN'][2][0], index=self.mouse_pos.index)
+        self.mouse_pos['smoothed_acceleration_y'] = pd.Series(smoothRes['xnN'][5][0], index=self.mouse_pos.index)
+        
+        self.mouse_pos['smoothed_position_x_var'] = pd.Series(smoothRes['VnN'][0][0], index=self.mouse_pos.index)
+        self.mouse_pos['smoothed_position_y_var'] = pd.Series(smoothRes['VnN'][3][3], index=self.mouse_pos.index)
+        self.mouse_pos['smoothed_velocity_x_var'] = pd.Series(smoothRes['VnN'][1][1], index=self.mouse_pos.index)
+        self.mouse_pos['smoothed_velocity_y_var'] = pd.Series(smoothRes['VnN'][4][4], index=self.mouse_pos.index)
+        self.mouse_pos['smoothed_acceleration_x_var'] = pd.Series(smoothRes['VnN'][2][2], index=self.mouse_pos.index)
+        self.mouse_pos['smoothed_acceleration_y_var'] = pd.Series(smoothRes['VnN'][5][5], index=self.mouse_pos.index)
 
 class Experiment:
     def __init__(self):
