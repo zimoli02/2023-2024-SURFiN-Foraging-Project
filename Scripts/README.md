@@ -70,7 +70,7 @@ $z_t = Cx_t + v_t$  with  $v_t \sim N(0,R)$
 - $C = 
 \begin{bmatrix} 
 1 & 0 & 0 & 0 & 0 & 0 \\
-0 & 0 & 0 & 0 & 0 & 1
+0 & 0 & 0 & 1 & 0 & 0
 \end{bmatrix}$  
 
 - $R = 

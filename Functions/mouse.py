@@ -886,7 +886,7 @@ class Mouse:
         mouse_pos = mouse_pos[mouse_pos['smoothed_acceleration']<8000]
         return mouse_pos
     
-    def FixNan(self, mouse_pos, column):
+    def Fix_Body_Info_Nan(self, mouse_pos, column):
         mouse_pos[column] = mouse_pos[column].interpolate()
         mouse_pos[column] = mouse_pos[column].bfill()
         mouse_pos[column] = mouse_pos[column].ffill()
@@ -898,10 +898,10 @@ class Mouse:
             
         if property == 'distance':
             self.mouse_pos[variable] = pd.Series(self.body_info.Process_Body_Node_Distance(nodes[0], nodes[1]), index = self.mouse_pos.index)
-            self.mouse_pos = self.FixNan(self.mouse_pos,variable)
+            self.mouse_pos = self.Fix_Body_Info_Nan(self.mouse_pos,variable)
         if property == 'angle':
             self.mouse_pos[variable] = pd.Series(self.body_info.Process_Body_Node_Angle(nodes[0], nodes[1], nodes[2]), index = self.mouse_pos.index)
-            self.mouse_pos = self.FixNan(self.mouse_pos,variable)
+            self.mouse_pos = self.Fix_Body_Info_Nan(self.mouse_pos,variable)
         
     def Add_Distance_to_mouse_pos(self):
         distance = np.sqrt((self.mouse_pos['smoothed_position_x'] - self.arena.origin[0]) ** 2 + (self.mouse_pos['smoothed_position_y'] - self.arena.origin[1]) ** 2)
@@ -935,7 +935,7 @@ class Session:
         
         return data_x[start:], data_y[start:]
     
-    def DeleteNan(self, df, df_):
+    def Delete_Unrecorded_Heat_and_Tail(self, df, df_):
         temp_df = df.dropna(subset=['spine2'])
         first_valid_index, last_valid_index = temp_df.index[0], temp_df.index[-1]
         df = df.loc[first_valid_index:last_valid_index]
@@ -992,7 +992,7 @@ class Session:
             data_y = pd.concat(dfs_y, ignore_index=False)
             data_x, data_y = data_x[::5],  data_y[::5]
             data_x, data_y = self.Fix_Start(data_x, data_y)
-            data_x, data_y = self.DeleteNan(data_x, data_y)
+            data_x, data_y = self.Delete_Unrecorded_Heat_and_Tail(data_x, data_y)
             
             data_x.to_parquet('../../SocialData/RawData/' + self.start + '_x.parquet', engine='pyarrow')
             data_y.to_parquet('../../SocialData/RawData/' + self.start + '_y.parquet', engine='pyarrow')
