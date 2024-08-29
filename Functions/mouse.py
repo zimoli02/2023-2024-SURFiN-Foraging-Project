@@ -2,15 +2,17 @@ import cv2
 import numpy as np
 import pandas as pd
 from scipy.special import factorial
-from sklearn.decomposition import PCA
+from scipy.linalg import inv, det
 from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import statsmodels.api as sm
 from collections import Counter
 import h5py
 from datetime import datetime, timedelta
 import torch
-'''import tensorflow as tf
-from tensorflow import keras'''
+
 
 
 import sys
@@ -54,6 +56,42 @@ class Regression:
         #self.X.loc[:, 'interc'] = np.ones(len(self.X))
         self.Y = self.visits[[self.predictor]]
     
+    def Logistic(self):
+        self.Get_Variables()
+        
+        split_size = int(len(self.Y) * self.split_perc)
+        indices = np.arange(len(self.Y))
+        
+        accuracy_max = -1e10
+        for i in range(100):
+            np.random.shuffle(indices)
+            
+            train_indices = indices[:split_size]
+            test_indices = indices[split_size:]
+
+            X_train, X_test = self.X.iloc[train_indices], self.X.iloc[test_indices]
+            Y_train, Y_test = self.Y.iloc[train_indices], self.Y.iloc[test_indices]
+            
+            model = LogisticRegression(random_state=42)
+            model.fit(X_train, Y_train.values.ravel())
+            # Make predictions on the test set
+            y_pred = model.predict(X_test)
+
+            # Calculate performance metrics
+            accuracy = accuracy_score(Y_test, y_pred)
+            '''
+            precision = precision_score(Y_test, y_pred)
+            recall = recall_score(Y_test, y_pred)
+            f1 = f1_score(Y_test, y_pred)
+            '''
+            
+
+            if accuracy > accuracy_max:  
+                result_valid = model
+                accuracy_max = accuracy
+        
+        return result_valid
+    
     def Poisson(self):
         self.Get_Variables()
         '''model = sm.GLM(self.Y, self.X, family=sm.families.Poisson(sm.families.links.Log()))
@@ -73,7 +111,8 @@ class Regression:
             Y_train, Y_test = self.Y.iloc[train_indices], self.Y.iloc[test_indices]
             
             model = sm.GLM(Y_train, X_train, family=sm.families.Poisson(sm.families.links.Log()))
-            result = model.fit_regularized(alpha=0.01, L1_wt=1.0, maxiter = 1000)
+            #result = model.fit_regularized(alpha=0.01, L1_wt=1.0, maxiter = 1000)
+            result = model.fit()
             Y_test_pred = result.predict(X_test)
             Y_test, Y_test_pred = Y_test.to_numpy().reshape(1,-1)[0], Y_test_pred.to_numpy()
             
@@ -117,28 +156,7 @@ class Regression:
         
         return y_test.to_numpy().reshape(1,-1)[0], y_pred.to_numpy(), result_valid
 
-    '''    
-    def Multilayer_Perceptron(self):
-        self.Get_Variables()
-        self.X = self.X.to_numpy().astype(np.float32)
-        self.Y = self.Y.to_numpy().reshape(1,-1)[0].astype(np.float32)
-        mid_point = int(len(self.Y)/2)
-        input_shape = (len(self.regressor)+1,)
-        model = keras.Sequential([
-                                    keras.layers.Dense(128, activation='relu', input_shape=input_shape),
-                                    keras.layers.Dense(64, activation='relu'),
-                                    keras.layers.Dropout(0.2),  # Dropout layer for regularization
-                                    keras.layers.Dense(32, activation='relu'),
-                                    keras.layers.Dense(1, activation='relu')  # Output layer with ReLU activation for non-negative predictions
-                                ])
 
-        model.compile(optimizer='adam',
-            loss='mean_squared_error',
-            metrics=['mae'])
-        model.fit(self.X[:mid_point], self.Y[:mid_point], epochs=100, batch_size=32)
-        predictions = model.predict(self.X[mid_point:])
-        return self.Y[mid_point:], predictions
-        '''
     
 class HMM:
     def __init__(self, mouse):
@@ -153,81 +171,136 @@ class HMM:
         self.TransM = None
         self.loglikelihood = None
         self.process_states = self.Process_States(self)
+        self.kl_divergence = None
         
     def Get_Features(self):
         if self.feature == 'Kinematics': self.features = ['smoothed_speed', 'smoothed_acceleration']
         if self.feature == 'Body': self.features = ['spine1-spine3','head-spine3', 'right_ear-spine3', 'left_ear-spine3']
         if self.feature == 'Kinematics_and_Body': self.features = ['smoothed_speed', 'smoothed_acceleration', 'spine1-spine3','head-spine3', 'right_ear-spine3', 'left_ear-spine3']
     
+    def Get_KL_Divergence(self):
+        def kl_divergence_gaussian(p_means, p_variances, q_means, q_variances):
+            k = len(p_means)
+    
+            q_variances_inv = inv(q_variances)
+            trace_term = np.trace(np.dot(q_variances_inv, p_variances))
+            
+            mean_diff = q_means - p_means
+            mean_term = np.dot(np.dot(mean_diff.T, q_variances_inv), mean_diff)
+
+            det_term = np.log(det(q_variances) / det(p_variances))
+
+            kl_div = 0.5 * (trace_term + mean_term - k + det_term)
+            
+            return kl_div
+
+        def symmetric_kl_divergence_gaussian(p_means, p_variances, q_means, q_variances):
+            kl_pq = kl_divergence_gaussian(p_means, p_variances, q_means, q_variances)
+            kl_qp = kl_divergence_gaussian(q_means, q_variances, p_means, p_variances)
+            return 0.5 * (kl_pq + kl_qp)
+
+        def create_kl_divergence_matrix(states):
+            n_states = len(states)
+            kl_matrix = np.zeros((n_states, n_states))
+            
+            for i in range(n_states):
+                for j in range(i, n_states):  # We only need to compute half the matrix due to symmetry
+                    p_means, p_variances = states[i]
+                    q_means, q_variances = states[j]
+                    kl_div = symmetric_kl_divergence_gaussian(p_means, p_variances, q_means, q_variances)
+                    kl_matrix[i, j] = kl_div
+                    kl_matrix[j, i] = kl_div  # Symmetric, so we fill both sides
+            
+            return kl_matrix
+        
+        states_params = [(self.parameters[0].T[i], self.parameters[2][i]) for i in range(self.n_state)]
+        self.kl_divergence = create_kl_divergence_matrix(states_params)
+    
     def Fit_Model(self, n_state, feature):
         self.n_state = n_state
         self.feature = feature
         self.Get_Features()
         
+        # Fit Models
         fitting_input = np.array(self.mouse.mouse_pos[self.model_period[0]:self.model_period[1]][self.features])
         self.model = ssm.HMM(self.n_state, len(fitting_input[0]), observations="gaussian")
         lls = self.model.fit(fitting_input, method="em", num_iters=50, init_method="kmeans")
-        self.parameters = self.model.observations.params[0].T
         
-        state_mean_speed = self.parameters[0]
+        # Sort Clusters Based on Ascending Speed
+        state_mean_speed = self.model.observations.params[0].T[0]
         index = np.argsort(state_mean_speed, -1) 
         
-        self.parameters = self.parameters.T[index].T
+        # Sort and Save Parameters
+        parameters_mean_sorted = self.model.observations.params[0][index].T
+        parameters_var = np.zeros((self.n_state,len(self.features)))
+        parameters_covar = self.model.observations.params[1]
+        for i in range(self.n_state):
+            for j in range(len(self.features)):
+                parameters_var[i][j] = self.model.observations.params[1][i][j][j] # state i, feature j 
+        parameters_var_sorted = parameters_var[index].T 
+        parameters_covar_sorted = parameters_covar[index]
+        self.parameters = [parameters_mean_sorted, parameters_var_sorted, parameters_covar_sorted]
         np.save('../../SocialData/HMMStates/Params_' + self.mouse.type + "_" + self.mouse.mouse + '.npy', self.parameters)
+        
+        # Sort and Save Transition Matrix
         self.TransM = self.model.transitions.transition_matrix[index].T[index].T
         np.save('../../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + '.npy', self.TransM)
         
+        # Infer, Sort and Save states
         obs = np.array(self.mouse.mouse_pos[self.features])
         self.loglikelihood = self.model.log_likelihood(obs)
         self.states = self.model.most_likely_states(obs)
-        
         new_values = np.empty_like(self.states)
         for i, val in enumerate(index): new_values[self.states == val] = i
         self.states = new_values
         np.save('../../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", self.states)
         
-    
     def Fit_Model_without_Saving(self, n_state, feature):
         self.n_state = n_state
         self.feature = feature
         self.Get_Features()
+        
         fitting_input = np.array(self.mouse.mouse_pos[self.model_period[0]:self.model_period[1]][self.features])
-        inferring_input = np.array(self.mouse.mouse_pos[self.model_period[0] + pd.Timedelta('1D'):self.model_period[1]+pd.Timedelta('1D')][self.features])
+        inferring_input = np.array(self.mouse.mouse_pos[self.features]) #np.array(self.mouse.mouse_pos[self.model_period[0] + pd.Timedelta('1D'):self.model_period[1]+pd.Timedelta('1D')][self.features])
         
         self.model = ssm.HMM(self.n_state, len(fitting_input[0]), observations="gaussian")
         self.loglikelihood = self.model.fit(fitting_input, method="em", num_iters=50, init_method="kmeans")
-        self.parameters = self.model.observations.params[0].T
         
+        # Sort Clusters Based on Ascending Speed
+        state_mean_speed = self.model.observations.params[0].T[0]
+        index = np.argsort(state_mean_speed, -1) 
+        
+        # Sort and Save Parameters
+        parameters_mean_sorted = self.model.observations.params[0][index].T
+        parameters_var = np.zeros((self.n_state,len(self.features)))
+        for i in range(self.n_state):
+            for j in range(len(self.features)):
+                parameters_var[i][j] = self.model.observations.params[1][i][j][j]
+        parameters_var_sorted = parameters_var[index].T 
+        self.parameters = (parameters_mean_sorted, parameters_var_sorted)
+        
+        # Sort and Save Transition Matrix
+        self.TransM = self.model.transitions.transition_matrix[index].T[index].T
+
+        # Infer States
         self.states = self.model.most_likely_states(inferring_input)
         self.loglikelihood = self.model.log_likelihood(inferring_input)
-        
-        state_mean_speed = self.parameters[0]
-        index = np.argsort(state_mean_speed, -1) 
         new_values = np.empty_like(self.states)
         for i, val in enumerate(index): new_values[self.states == val] = i
         self.states = new_values
-        self.TransM = self.model.transitions.transition_matrix[index].T[index].T
-    
-    def Get_TransM(self, n_state, feature):
-        try:
-            self.TransM = np.load('../../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
-            self.n_state = n_state
-            self.feature = feature
-            self.Get_Features()
-        except FileNotFoundError:
-            self.Fit_Model(n_state, feature)
-                
     
     def Get_States(self, n_state, feature):
         try:
+            self.TransM = np.load('../../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
+            self.parameters = np.load('../../SocialData/HMMStates/Params_' + self.mouse.type + "_" + self.mouse.mouse + '.npy', allow_pickle=True)
             self.states = np.load('../../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
             self.n_state = n_state
             self.feature = feature
+            self.Get_KL_Divergence()
             self.Get_Features()
         except FileNotFoundError:
             self.Fit_Model(n_state, feature)
-                
-            
+                        
     class Process_States:
         def __init__(self, hmm):
             self.hmm = hmm
@@ -284,6 +357,46 @@ class HMM:
                 if len(Variable) == 10*(left_seconds + right_seconds) + insert_nan: 
                     VARIABLES.append(Variable)
             return np.array(VARIABLES)
+        
+        def Find_Event_Sequence(self, STATES):
+            def most_frequent(arr):
+                count_dict = {}
+                for num in arr:
+                    if num in count_dict:
+                        count_dict[num] += 1
+                    else:
+                        count_dict[num] = 1
+                
+                max_count = 0
+                most_frequent_num = None
+                for num, count in count_dict.items():
+                    if count > max_count:
+                        max_count = count
+                        most_frequent_num = num
+                
+                return most_frequent_num
+            
+            sequence = [most_frequent(STATES.T[i]) for i in range(len(STATES[0]))]
+            return sequence
+        
+        def Compare_Sequence(self, seq1, seq2, kl_matrix, window = None):
+            nx, ny = len(seq1), len(seq2)
+
+            cost = np.zeros((nx + 1, ny + 1))
+            cost[0, 1:] = np.inf
+            cost[1:, 0] = np.inf
+
+            for i in range(1, nx + 1):
+                if window is None:
+                    j_start, j_stop = 1, ny + 1
+                else:
+                    j_start = max(1, i - window)
+                    j_stop = min(ny + 1, i + window + 1)
+                for j in range(j_start, j_stop):
+                    cost[i, j] = kl_matrix[int(seq1[i-1]-1), int(seq2[j-1]-1)]
+                    cost[i, j] += min(cost[i-1, j], cost[i, j-1], cost[i-1, j-1])
+            
+            return cost[-1, -1]
             
 class Arena:
     def __init__(self, mouse):
