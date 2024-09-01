@@ -3,17 +3,13 @@ import numpy as np
 import pandas as pd
 from scipy.special import factorial
 from scipy.linalg import inv, det
-from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score
 import statsmodels.api as sm
-from collections import Counter
 import h5py
 from datetime import datetime, timedelta
 import torch
-
-
+from dotmap import DotMap
 
 import sys
 from pathlib import Path
@@ -33,8 +29,6 @@ sys.path.insert(0, str(aeon_mecha_dir))
 import aeon
 import aeon.io.api as api
 from aeon.io import reader, video
-from aeon.schema.schemas import social02
-from aeon.schema.dataset import exp02
 from aeon.schema.schemas import social02
 from aeon.analysis.utils import visits, distancetravelled
 
@@ -156,8 +150,6 @@ class Regression:
         
         return y_test.to_numpy().reshape(1,-1)[0], y_pred.to_numpy(), result_valid
 
-
-    
 class HMM:
     def __init__(self, mouse):
         self.mouse = mouse
@@ -763,7 +755,6 @@ class Kinematics:
         return parameters
     
     def Learn_Parameters(self, y, sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, Z):
-        # Learning Parameters
         lbfgs_max_iter = 2
         lbfgs_tolerance_grad = 1e-3
         lbfgs_tolerance_change = 1e-3
@@ -821,7 +812,6 @@ class Kinematics:
             P = np.load('../../SocialData/LDS_Parameters/' + self.mouse.type + '_' + self.mouse.mouse + '_Parameters.npz', allow_pickle=True)
             sigma_a, sigma_x, sigma_y, sqrt_diag_V0_value, B, Qe, m0, V0, Z, R = P['sigma_a'].item(), P['sigma_x'].item(), P['sigma_y'].item(), P['sqrt_diag_V0_value'].item(), P['B'], P['Qe'], P['m0'], P['V0'], P['Z'], P['R']
         except FileNotFoundError:
-            #10Hz Data
             mouse_pos = self.Get_Observations()
             obs = np.transpose(mouse_pos[["x", "y"]].to_numpy())
             
@@ -928,6 +918,7 @@ class Mouse:
         self.root = self.Get_Root()
         self.INFO = self.Get_INFO()
         self.starts, self.ends = self.Get_Start_Times()
+        self.experiment_starts, self.experiment_ends = self.Get_Experiment_Times()
         self.active_chunk = self.Get_Active_Chunk()
         
         self.body_data_x, self.body_data_y = self.Combine_SLEAP_Data()
@@ -953,6 +944,59 @@ class Mouse:
                 starts.append(self.INFO["Start"][i])
                 ends.append(self.INFO["End"][i])
         return starts, ends
+    
+    def Get_Experiment_Times(self):
+        start_time = datetime.strptime(self.starts[0], '%Y-%m-%dT%H-%M-%S')
+        end_time = datetime.strptime(self.ends[-1], '%Y-%m-%dT%H-%M-%S') + pd.Timedelta('3H')
+        
+        experiment_times = DotMap()
+        env_states = aeon.load(
+            self.root,
+            social02.Environment.EnvironmentState,
+            start_time,
+            end_time
+        )
+
+        # Use the last 'maintenance' event as end time
+        end_time = (env_states[env_states.state == "Maintenance"]).index[-1]
+        env_states = env_states[~env_states.index.duplicated(keep="first")]
+
+        # Retain only events between visit start and stop times
+        env_states = env_states.iloc[
+            env_states.index.get_indexer([start_time], method="bfill")[
+                0
+            ] : env_states.index.get_indexer([end_time], method="ffill")[0] + 1
+        ]
+
+        # Retain only events where state changes (experiment-maintenance pairs)
+        env_states = env_states[env_states["state"].ne(env_states["state"].shift())]
+        if env_states["state"].iloc[0] == "Maintenance":
+            # Pad with an "Experiment" event at the start
+            env_states = pd.concat(
+                [
+                    pd.DataFrame(
+                        "Experiment",
+                        index=[start_time],
+                        columns=env_states.columns,
+                    ),
+                    env_states,
+                ]
+            )
+        else:
+            # Use start time as the first "Experiment" event
+            env_states.rename(index={env_states.index[0]: start_time}, inplace=True)
+        experiment_times.start = env_states[
+            env_states["state"] == "Experiment"
+        ].index.values
+        experiment_times.stop = env_states[
+            env_states["state"] == "Maintenance"
+        ].index.values
+        
+        return experiment_times.start, experiment_times.stop
+    
+    def Exclude_Maintainance(self, mouse_pos):
+        filtered_data = pd.concat([mouse_pos.loc[start:stop] for start, stop in zip(self.experiment_starts, self.experiment_ends)])
+        return filtered_data
     
     def Get_Active_Chunk(self):
         start = datetime.strptime(self.starts[0], '%Y-%m-%dT%H-%M-%S')
@@ -995,8 +1039,9 @@ class Mouse:
             session.Add_Kinematics(self)
             mouse_pos.append(session.mouse_pos)
         mouse_pos = pd.concat(mouse_pos, ignore_index=False)
-        mouse_pos = mouse_pos[mouse_pos['smoothed_speed']<2000]
-        mouse_pos = mouse_pos[mouse_pos['smoothed_acceleration']<8000]
+        '''mouse_pos = mouse_pos[mouse_pos['smoothed_speed']<2000]
+        mouse_pos = mouse_pos[mouse_pos['smoothed_acceleration']<8000]'''
+        mouse_pos = self.Exclude_Maintainance(mouse_pos)
         return mouse_pos
     
     def Fix_Body_Info_Nan(self, mouse_pos, column):
@@ -1039,6 +1084,7 @@ class Session:
     def Fix_Start(self, data_x, data_y):
         start = data_x.index[0]
         
+        if self.start == "2024-02-02T00-15-00": start = pd.Timestamp('2024-02-02 00:16:15.0')
         if self.start == '2024-02-25T17-22-33': start = pd.Timestamp('2024-02-25 17:32:33.0')
         if self.start == '2024-02-28T13-54-17': start = pd.Timestamp('2024-02-28 13:58:45.0')
         if self.start == '2024-01-31T10-14-14': start = pd.Timestamp('2024-01-31 10:21:35.0')
@@ -1048,7 +1094,7 @@ class Session:
         
         return data_x[start:], data_y[start:]
     
-    def Delete_Unrecorded_Heat_and_Tail(self, df, df_):
+    def Delete_Unrecorded_Head_and_Tail(self, df, df_):
         temp_df = df.dropna(subset=['spine2'])
         first_valid_index, last_valid_index = temp_df.index[0], temp_df.index[-1]
         df = df.loc[first_valid_index:last_valid_index]
@@ -1101,11 +1147,10 @@ class Session:
                 df_y = pd.DataFrame(tracks_matrix[0][1].T, index=timestamps, columns=nodes_name)
                 dfs_y.append(df_y)
             
-            data_x = pd.concat(dfs_x, ignore_index=False)
-            data_y = pd.concat(dfs_y, ignore_index=False)
+            data_x, data_y = pd.concat(dfs_x, ignore_index=False), pd.concat(dfs_y, ignore_index=False)
             data_x, data_y = data_x[::5],  data_y[::5]
             data_x, data_y = self.Fix_Start(data_x, data_y)
-            data_x, data_y = self.Delete_Unrecorded_Heat_and_Tail(data_x, data_y)
+            data_x, data_y = self.Delete_Unrecorded_Head_and_Tail(data_x, data_y)
             
             data_x.to_parquet('../../SocialData/RawData/' + self.start + '_x.parquet', engine='pyarrow')
             data_y.to_parquet('../../SocialData/RawData/' + self.start + '_y.parquet', engine='pyarrow')
@@ -1113,8 +1158,7 @@ class Session:
         return data_x, data_y
 
     def Get_Mouse_Pos(self):
-        x = self.body_data_x['spine2']
-        y = self.body_data_y['spine2']
+        x, y = self.body_data_x['spine2'], self.body_data_y['spine2']
         mouse_pos = pd.DataFrame({'x': x, 'y': y})
         mouse_pos['x'] = mouse_pos['x'].interpolate()
         mouse_pos['y'] = mouse_pos['y'].interpolate()
@@ -1146,6 +1190,10 @@ class Session:
         self.mouse_pos['smoothed_velocity_y_var'] = pd.Series(smoothRes['VnN'][4][4], index=self.mouse_pos.index)
         self.mouse_pos['smoothed_acceleration_x_var'] = pd.Series(smoothRes['VnN'][2][2], index=self.mouse_pos.index)
         self.mouse_pos['smoothed_acceleration_y_var'] = pd.Series(smoothRes['VnN'][5][5], index=self.mouse_pos.index)
+        
+        start = self.mouse_pos.index[0] + pd.Timedelta('60S')
+        end = self.mouse_pos.index[-1] - pd.Timedelta('60S')
+        self.mouse_pos = self.mouse_pos[start:end]
 
 class Experiment:
     def __init__(self):
