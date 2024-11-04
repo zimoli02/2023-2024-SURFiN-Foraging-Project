@@ -2,9 +2,9 @@ Report/
 Images/
 Videos/
 SfNPoster/
-Code/job.sh
-Code/LDSParams.py
-Code/EventFrame.py
-Code/CheckPost045.py
-Code/Videos.py
-Code/Social_Example.ipynb
+Scripts/job.sh
+Scripts/LDSParams.py
+Scripts/EventFrame.py
+Scripts/CheckPost045.py
+Scripts/Videos.py
+Scripts/Social_Example.ipynb
