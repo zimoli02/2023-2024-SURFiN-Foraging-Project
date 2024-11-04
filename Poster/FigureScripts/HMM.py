@@ -22,8 +22,8 @@ from SSM.ssm.util import find_permutation
 from SSM.ssm.plots import gradient_cmap, white_to_color_cmap
 
 import Functions.HMM as HMM
-import SURF.UsedCode.kinematics as kinematics
-import SURF.UsedCode.patchatch as patch
+import SURF_backup.UsedCode.kinematics as kinematics
+import SURF_backup.UsedCode.patchatch as patch
 
 
 root = [Path("/ceph/aeon/aeon/data/raw/AEON2/experiment0.2")]

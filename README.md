@@ -10,4 +10,4 @@ We use theories from linear dynamical systems (LDS) to model the kinematics of m
 See [Scripts](/Scripts) used in the project.
 
 ## Figures Presented in the SURFiN Symposium Poster
-See [Figures](/Figures) that contains scripts and notebooks for figure reproduction.
+See [Poster](/Poster) that contains scripts and notebooks for figure reproduction.

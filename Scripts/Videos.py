@@ -98,6 +98,17 @@ def combine_videos(input_dir, output_dir, row, column, output_filename, scale):
     except subprocess.CalledProcessError as e:
         print(f"An error occurred while combining videos: {e}")
 
+def Export_Video_Top(root, start, end, file_name):
+    video_metadata = aeon.load(root, social02.CameraTop.Video, start=start + pd.Timedelta('1860S'), end=start + pd.Timedelta('1920S'))
+    
+    video_metadata.index = video_metadata.index.round("20L")  # round timestamps to nearest 20 ms
+    frames = video.frames(video_metadata)  # get actual frames based on vid metadata
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    vid = cv2.VideoWriter("../Videos/" + file_name + ".mp4", fourcc=fourcc, fps=50, frameSize=(1440, 1080))  # will save to current dir
+    for f in frames:  # write out frames to vid, frame-by-frame
+        vid.write(f)
+    vid.release()
+
 def Export_Video_Nest(root, start, end, file_name):
     video_metadata = aeon.load(root, social02.CameraNest.Video, start=start, end=end)
     
@@ -160,8 +171,8 @@ def Export_Video_Patch_with_State(root, patch, start, end, states, file_name):
     video_metadata.index = video_metadata.index.round("10L")  # round timestamps to nearest 10 ms
     
     # Adjust length
-    video_metadata = video_metadata[~video_metadata.index.duplicated(keep='first')][:300]
-    states = np.repeat(states[:30], 10) 
+    video_metadata = video_metadata[~video_metadata.index.duplicated(keep='first')][:150]
+    states = np.repeat(states[:15], 10) 
     
     frames = video.frames(video_metadata)  # get actual frames based on vid metadata
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
@@ -195,19 +206,28 @@ def Get_Event_State(Mouse, trigger, right_seconds):
     
 def main():
     
-    Mouse = mouse.Mouse(aeon_exp = 'AEON3', type = 'Pre', mouse = 'BAA-1104045')
-    states = np.load('../../SocialData/HMMStates/States_Pre_BAA-1104045.npy', allow_pickle=True)
+    Mouse = mouse.Mouse(aeon_exp = 'AEON3', type = 'Post', mouse = 'BAA-1104045')
+    #states = np.load('../../SocialData/HMMStates/States_Pre_BAA-1104047.npy', allow_pickle=True)
     Mouse.Run_Visits()
 
-    Mouse.mouse_pos['state'] = pd.Series(states, index = Mouse.mouse_pos.index)
+    #Mouse.mouse_pos['state'] = pd.Series(states, index = Mouse.mouse_pos.index)
     patch_loc = [Mouse.arena.patch_location['Patch' + str(i+1)] for i in range(3)]
     
     root = Mouse.root
     input_dir = Path("../Videos/SubVideos")
     output_dir = Path("../Videos")
     
+    # top view
+    '''
+    start = Mouse.mouse_pos.index[0]
+    end = start + pd.Timedelta('60S')
+    Export_Video_Top(root, start, end, file_name='Top')
+    print('Export_Video_Top Completed')
+    '''
+
     # nest state 1
-    '''idx = [387221, 535534, 619131, 639646, 818841, 1233484, 1405769, 1518902, 1806994, 1835481, 2081265, 2144370, 2228862, 2272409, 2304439, 2509486] # Mouse Pre 045
+    '''
+    idx = [387221, 535534, 619131, 639646, 818841, 1233484, 1405769, 1518902, 1806994, 1835481, 2081265, 2144370, 2228862, 2272409, 2304439, 2509486] # Mouse Pre 045
     for i in range(len(idx)):
         trigger = Mouse.mouse_pos.index[idx[i]]
         states = Get_Event_State(Mouse, trigger, 3)
@@ -283,10 +303,10 @@ def main():
     
     
     # arena state - grooming
-    
+    '''
     idx = [25327,108123,928695,1065510,1528816,1620069,1627275,1628765,1674693,1678561,1698418,1849673,2542977] # Mouse Pre 045
     #idx = [25928,106952,1631012,1630265, 1631760, 108729,929296,979442] # Mouse Pre 045
-    '''idx = [849618, 1582605, 1649143] # Mouse Post 047'''
+    #idx = [849618, 1582605, 1649143] # Mouse Post 047
     for i in range(9):
         trigger = Mouse.mouse_pos.index[idx[i]]
         states = Get_Event_State(Mouse, trigger, 3)
@@ -304,34 +324,33 @@ def main():
         
     combine_videos(input_dir, output_dir, 3, 3, "ArenaStateGrooming_Pre_045.mp4", scale = '720x540')
     print('ArenaStateGrooming')
-    
     '''
+    
+    
     # Start Visit
-    idx = [19, 28, 101, 121, 131, 46, 47, 139, 104] # Mouse 045
+    '''
+    #idx = [19, 28, 101, 121, 131, 46, 47, 139, 104] # Mouse 045
+    idx = [63,79,84,89,96,98,118,131,133] #Pre-047
     for i in range(len(idx)):
-        trigger = Mouse.arena.visits['start'][idx[i]] - pd.Timedelta("1.5S")
+        trigger = Mouse.arena.visits['start'][idx[i]] - pd.Timedelta("1S")
         states = Get_Event_State(Mouse, trigger, 3)
 
-        x = Mouse.mouse_pos.smoothed_position_x[idx[i]]
-        y = Mouse.mouse_pos.smoothed_position_y[idx[i]]
-        patch_distance = [(x-patch_loc[j][0])**2 + (y-patch_loc[j][1])**2 for j in range(3)]
-        patch_idx = np.argsort(patch_distance)[0]
-        patch = 'Patch' + str(patch_idx + 1)
-    
+        patch = Mouse.arena.visits['patch'][idx[i]]
         start, end = trigger, trigger + pd.Timedelta("3S")
 
         Export_Video_Patch_with_State(root, patch, start, end, states, 'video' + str(i+1))
         print('Export '+ 'video' + str(i+1))
         
-    combine_videos(input_dir, output_dir, 3, 3, "StartVisit_All_045.mp4", scale = '720x540')
+    combine_videos(input_dir, output_dir, 3, 3, "StartVisit_All_Pre_047.mp4", scale = '720x540')
     print('StartVisit_All_045')
     '''
     
     # PelletStates
     '''
-    pellets_idx = [12, 23, 72, 94, 110, 115, 156, 166, 196, 241, 298, 334, 340, 405, 430, 490] # Mouse Pre 045
-    pellets_idx = [132, 162, 245, 255, 302, 326, 381, 390, 425, 440, 456, 482, 494, 497, 514, 532, 536, 633, 635, 643] # Mouse Post 047
-    for i in range(len(pellets_idx[:16])):
+    #pellets_idx = [12, 23, 72, 94, 110, 115, 156, 166, 196, 241, 298, 334, 340, 405, 430, 490] # Mouse Pre 045
+    #pellets_idx = [132, 162, 245, 255, 302, 326, 381, 390, 425, 440, 456, 482, 494, 497, 514, 532, 536, 633, 635, 643] # Mouse Post 047
+    pellets_idx = [115, 160, 213, 269, 291, 323, 372, 429, 472, 473] # Pre-047
+    for i in range(len(pellets_idx[:9])):
         trigger = Mouse.arena.pellets.index[pellets_idx[i]]
         states = Get_Event_State(Mouse, trigger, 3)
 
@@ -341,28 +360,32 @@ def main():
 
         Export_Video_Patch_with_State(root, patch, start, end, states, 'video' + str(i+1))
         print('Export '+ 'video' + str(i+1))
-    combine_videos(input_dir, output_dir, 4, 4, "PelletState_All_047.mp4", scale = '720x540')
+    combine_videos(input_dir, output_dir, 3, 3, "PelletState_All_Pre_047.mp4", scale = '720x540')
     print('PelletState_All')
     '''
     
-    # PelletState6_7
+    # PelletState_Transition
     '''
-    pellets_idx = [11, 12, 107, 122, 150, 189, 202, 283, 293, 307, 334, 337, 431, 539, 550, 556] # Mouse Pre 045
-    pellets_idx = [2, 8, 12, 61, 114, 161, 165, 244, 259, 274, 285, 289, 328, 390, 435, 440, 445, 448, 465, 489, 514, 600, 647, 678] # Mouse Post 047
-    for i in range(len(pellets_idx[0:16])):
+    #pellets_idx = [11, 12, 107, 122, 150, 189, 202, 283, 293, 307, 334, 337, 431, 539, 550, 556] # Mouse Pre 045
+    #pellets_idx = [2, 8, 12, 61, 114, 161, 165, 244, 259, 274, 285, 289, 328, 390, 435, 440, 445, 448, 465, 489, 514, 600, 647, 678] # Mouse Post 047
+    pellets_idx = [35, 42, 70, 87, 95, 227, 261, 302, 338] #Mouse Pre-047
+    print(Mouse.mouse)
+    print(Mouse.type)
+    print(len(Mouse.arena.pellets.index))
+    for i in range(len(pellets_idx)):
         trigger = Mouse.arena.pellets.index[pellets_idx[i]]
         states = Get_Event_State(Mouse, trigger, 3)
+        start, end = trigger, trigger + pd.Timedelta("3S")
 
         idx = Mouse.arena.visits['start'].searchsorted(trigger, side='right') - 1
         patch = Mouse.arena.visits['patch'][idx]
-        start, end = trigger, trigger + pd.Timedelta("3S")
-
+        
         Export_Video_Patch_with_State(root, patch, start, end, states, 'video' + str(i+1))
         print('Export '+ 'video' + str(i+1))
         
-    combine_videos(input_dir, output_dir, 4, 4, "PelletState_Transit_All_047.mp4", scale = '720x540')
-    print('PelletState6_7')'''
-    
+    combine_videos(input_dir, output_dir, 3, 3, "PelletState_Transit_All_Pre_047.mp4", scale = '720x540')
+    print('PelletState6_7')
+    '''
     
 if __name__ == "__main__":
     main()

@@ -171,7 +171,6 @@ def scipy_optimize_SS_tracking_diagV0(y, B, sigma_ax0, sigma_ay0, Qe, Z,
               "x": x}
     return answer
 
-
 def torch_lbfgs_optimize_SS_tracking_diagV0(y, B, sigma_a0, Qe, Z,
                                             sqrt_diag_R_0, m0_0, sqrt_diag_V0_0,
                                             max_iter=20, lr=1.0,
@@ -188,41 +187,40 @@ def torch_lbfgs_optimize_SS_tracking_diagV0(y, B, sigma_a0, Qe, Z,
         V0 = torch.diag(sqrt_diag_V0**2)
         R = torch.diag(sqrt_diag_R**2)
         Q = Qe * sigma_a**2
-        kf = inference.filterLDS_SS_withMissingValues_torch(y=y, B=B, Q=Q,
-                                                            m0=m0, V0=V0, Z=Z,
-                                                            R=R)
-        log_like = kf["logLike"]
+        log_like = inference.logLikeLDS_SS_withMissingValues_torch(
+            y=y, B=B, Q=Q, m0=m0, V0=V0, Z=Z, R=R)
         return log_like
 
     optim_params = {"max_iter": max_iter, "lr": lr,
                     "tolerance_grad": tolerance_grad,
                     "tolerance_change": tolerance_change,
                     "line_search_fn": line_search_fn}
-    
-    sigma_a = torch.Tensor([sigma_a0])
+    sigma_a = torch.tensor([sigma_a0], dtype=torch.double)
     sqrt_diag_R = sqrt_diag_R_0
     m0 = m0_0
     sqrt_diag_V0 = sqrt_diag_V0_0
-
     x = []
-    if vars_to_estimate["sigma_a"]:      x.append(sigma_a)
-    if vars_to_estimate["sqrt_diag_R"]:  x.append(sqrt_diag_R)
-    if vars_to_estimate["m0"]:           x.append(m0)
-    if vars_to_estimate["sqrt_diag_V0"]: x.append(sqrt_diag_V0)
-
-    if len(x) == 0: raise RuntimeError("No variable to estimate. Please set one element ""of vars_to_estimate to True")
-    
+    if vars_to_estimate["sigma_a"]:
+        x.append(sigma_a)
+    if vars_to_estimate["sqrt_diag_R"]:
+        x.append(sqrt_diag_R)
+    if vars_to_estimate["m0"]:
+        x.append(m0)
+    if vars_to_estimate["sqrt_diag_V0"]:
+        x.append(sqrt_diag_V0)
+    if len(x) == 0:
+        raise RuntimeError("No variable to estimate. Please set one element "
+                           "of vars_to_estimate to True")
     optimizer = torch.optim.LBFGS(x, **optim_params)
-    for i in range(len(x)): x[i].requires_grad = True
+    for i in range(len(x)):
+        x[i].requires_grad = True
 
     def closure():
-        optimizer.zero_grad()                ## clears out the old gradients from the previous step
-        curEval = -log_likelihood_fn()       ## Computes the negative log likelihood
-        curEval.backward(retain_graph=True)  ## Computes the gradient of curEval with respect to all the tensors (parameters) 
-                                                ## that have requires_grad set to True.
-                                                ## Stores these gradients in the .grad attribute of the respective tensors.
-        return curEval                       ## Returns the current evaluation (curEval)
-                                                ## which the optimizer uses to determine the direction and magnitude of the update
+        optimizer.zero_grad()
+        curEval = -log_likelihood_fn()
+        print(f"in closure, ll={-curEval}")
+        curEval.backward(retain_graph=True)
+        return curEval
 
     termination_info = "success: reached maximum number of iterations"
     log_like = []
@@ -231,7 +229,7 @@ def torch_lbfgs_optimize_SS_tracking_diagV0(y, B, sigma_a0, Qe, Z,
     for epoch in range(n_epochs):
         prev_x = copy.deepcopy(x)
         try:
-            curEval = optimizer.step(closure) # update parameters
+            curEval = optimizer.step(closure)
         except RuntimeError:
             # begin backtracking
             if vars_to_estimate["sigma_a"]:
@@ -249,10 +247,8 @@ def torch_lbfgs_optimize_SS_tracking_diagV0(y, B, sigma_a0, Qe, Z,
             # end backtracking
             termination_info = "nan generated"
             break
-        
         log_like.append(-curEval.item())
         elapsed_time.append(time.time() - start_time)
-
         print("--------------------------------------------------------------------------------")
         print(f"epoch: {epoch}")
         print(f"likelihood: {log_like[-1]}")
@@ -268,10 +264,9 @@ def torch_lbfgs_optimize_SS_tracking_diagV0(y, B, sigma_a0, Qe, Z,
         if vars_to_estimate["sqrt_diag_V0"]:
             print("sqrt_diag_V0: ")
             print(sqrt_diag_V0)
-        if epoch > 0 and log_like[-1] - log_like[-2] < tol: # if meet the maximum log likelihood
+        if epoch > 0 and log_like[-1] - log_like[-2] < tol:
             termination_info = "success: converged"
             break
-
     for i in range(len(x)):
         x[i].requires_grad = False
 
@@ -289,7 +284,6 @@ def torch_lbfgs_optimize_SS_tracking_diagV0(y, B, sigma_a0, Qe, Z,
               "elapsed_time": elapsed_time,
               "termination_info": termination_info}
     return answer
-
 
 def torch_adam_optimize_SS_tracking_diagV0(y, B, sigma_a0, Qe, Z,
                                            sqrt_diag_R_0, m0_0, sqrt_diag_V0_0,

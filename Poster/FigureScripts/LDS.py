@@ -13,7 +13,7 @@ aeon_mecha_dir = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(aeon_mecha_dir))
 
 
-import SURF.UsedCode.kinematics as kinematics
+import SURF_backup.UsedCode.kinematics as kinematics
 
 start, end = 10*60*50+2220, 10*60*50+2240
 dt = 0.02

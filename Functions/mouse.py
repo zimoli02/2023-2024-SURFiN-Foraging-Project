@@ -127,7 +127,7 @@ class Regression:
         indices = np.arange(len(self.Y))
         
         corre_max = -1
-        for i in range(1000):
+        for i in range(100):
             np.random.shuffle(indices)
             
             train_indices = indices[:split_size]
@@ -139,16 +139,15 @@ class Regression:
             model = sm.GLM(Y_train, X_train, family=sm.families.Gaussian())
             result = model.fit()
             Y_test_pred = result.predict(X_test)
+            Y_test, Y_test_pred = Y_test.to_numpy().reshape(1,-1)[0], Y_test_pred.to_numpy()
 
-            corre = np.corrcoef(Y_test_pred.to_numpy(), Y_test.to_numpy().reshape(1,-1)[0])[0,1]
+            corre = np.corrcoef(Y_test, Y_test_pred)[0,1]
             if corre > corre_max:  
                 result_valid = result
                 x_test, y_test = X_test, Y_test
                 corre_max = corre
-            
-        y_pred = result_valid.predict(x_test)
         
-        return y_test.to_numpy().reshape(1,-1)[0], y_pred.to_numpy(), result_valid
+        return result_valid
 
 class HMM:
     def __init__(self, mouse):
@@ -164,11 +163,12 @@ class HMM:
         self.loglikelihood = None
         self.process_states = self.Process_States(self)
         self.kl_divergence = None
+        self.ConnecM = None
         
     def Get_Features(self):
         if self.feature == 'Kinematics': self.features = ['smoothed_speed', 'smoothed_acceleration']
         if self.feature == 'Body': self.features = ['spine1-spine3','head-spine3', 'right_ear-spine3', 'left_ear-spine3']
-        if self.feature == 'Kinematics_and_Body': self.features = ['smoothed_speed', 'smoothed_acceleration', 'spine1-spine3','head-spine3', 'right_ear-spine3', 'left_ear-spine3']
+        if self.feature == 'Kinematics_and_Body': self.features = ['smoothed_speed', 'smoothed_acceleration', 'head-spine3', 'left_ear-spine3', 'right_ear-spine3', 'spine1-spine3']
     
     def Get_KL_Divergence(self):
         def kl_divergence_gaussian(p_means, p_variances, q_means, q_variances):
@@ -184,29 +184,34 @@ class HMM:
 
             kl_div = 0.5 * (trace_term + mean_term - k + det_term)
             
-            return kl_div
-
-        def symmetric_kl_divergence_gaussian(p_means, p_variances, q_means, q_variances):
-            kl_pq = kl_divergence_gaussian(p_means, p_variances, q_means, q_variances)
-            kl_qp = kl_divergence_gaussian(q_means, q_variances, p_means, p_variances)
-            return 0.5 * (kl_pq + kl_qp)
+            return max(0, kl_div)
 
         def create_kl_divergence_matrix(states):
             n_states = len(states)
             kl_matrix = np.zeros((n_states, n_states))
             
             for i in range(n_states):
-                for j in range(i, n_states):  # We only need to compute half the matrix due to symmetry
-                    p_means, p_variances = states[i]
-                    q_means, q_variances = states[j]
-                    kl_div = symmetric_kl_divergence_gaussian(p_means, p_variances, q_means, q_variances)
-                    kl_matrix[i, j] = kl_div
-                    kl_matrix[j, i] = kl_div  # Symmetric, so we fill both sides
+                for j in range(n_states):  
+                    p_means, p_variances = states[j]
+                    q_means, q_variances = states[i]
+                    kl_matrix[i, j] = kl_divergence_gaussian(p_means, p_variances, q_means, q_variances)
+
             
             return kl_matrix
         
         states_params = [(self.parameters[0].T[i], self.parameters[2][i]) for i in range(self.n_state)]
         self.kl_divergence = create_kl_divergence_matrix(states_params)
+    
+    def Get_ConnecM(self):
+        ConnecM = np.zeros((10,10))
+        states = self.states
+        for i in range(len(states)-1):
+            if states[i+1] != states[i]:
+                ConnecM[states[i]][states[i+1]] += 1
+        for i in range(10):
+            ConnecM[i] = ConnecM[i]/np.sum(ConnecM[i])
+            
+        self.ConnecM = ConnecM
     
     def Fit_Model(self, n_state, feature):
         self.n_state = n_state
@@ -258,6 +263,7 @@ class HMM:
         self.model = ssm.HMM(self.n_state, len(fitting_input[0]), observations="gaussian")
         self.loglikelihood = self.model.fit(fitting_input, method="em", num_iters=50, init_method="kmeans")
         
+        ''' 
         # Sort Clusters Based on Ascending Speed
         state_mean_speed = self.model.observations.params[0].T[0]
         index = np.argsort(state_mean_speed, -1) 
@@ -265,11 +271,13 @@ class HMM:
         # Sort and Save Parameters
         parameters_mean_sorted = self.model.observations.params[0][index].T
         parameters_var = np.zeros((self.n_state,len(self.features)))
+        parameters_covar = self.model.observations.params[1]
         for i in range(self.n_state):
             for j in range(len(self.features)):
-                parameters_var[i][j] = self.model.observations.params[1][i][j][j]
+                parameters_var[i][j] = self.model.observations.params[1][i][j][j] # state i, feature j 
         parameters_var_sorted = parameters_var[index].T 
-        self.parameters = (parameters_mean_sorted, parameters_var_sorted)
+        parameters_covar_sorted = parameters_covar[index]
+        self.parameters = [parameters_mean_sorted, parameters_var_sorted, parameters_covar_sorted]
         
         # Sort and Save Transition Matrix
         self.TransM = self.model.transitions.transition_matrix[index].T[index].T
@@ -280,19 +288,22 @@ class HMM:
         new_values = np.empty_like(self.states)
         for i, val in enumerate(index): new_values[self.states == val] = i
         self.states = new_values
+        '''
     
     def Get_States(self, n_state, feature):
         try:
             self.TransM = np.load('../../SocialData/HMMStates/TransM_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
             self.parameters = np.load('../../SocialData/HMMStates/Params_' + self.mouse.type + "_" + self.mouse.mouse + '.npy', allow_pickle=True)
             self.states = np.load('../../SocialData/HMMStates/States_' + self.mouse.type + "_" + self.mouse.mouse + ".npy", allow_pickle=True)
-            self.n_state = n_state
-            self.feature = feature
-            self.Get_KL_Divergence()
-            self.Get_Features()
         except FileNotFoundError:
             self.Fit_Model(n_state, feature)
-                        
+
+        self.n_state = n_state
+        self.feature = feature
+        self.Get_Features()
+        self.Get_KL_Divergence()
+        self.Get_ConnecM()
+        
     class Process_States:
         def __init__(self, hmm):
             self.hmm = hmm
@@ -328,50 +339,44 @@ class HMM:
                 mouse_pos.loc[mouse_pos.index, 'State' + str(i)] = Calculate_Count_Curve(mouse_pos['state'].to_numpy(), target_state = i, window_size = timewindow)
             return mouse_pos
             
-        def Event_Triggering(self, mouse_pos, Events, left_seconds, right_seconds, variable = 'state', insert_nan = 1):
+        def Event_Triggering(self, mouse_pos, Events, left_seconds, right_seconds, variable = 'state', insert_nan = 1, return_Events = False):
             left_period = pd.Timedelta(str(left_seconds+1) + 'S')
             right_period = pd.Timedelta(str(right_seconds+1) + 'S')
+            
+            Valid_Events = []
             VARIABLES = []
             for i in range(len(Events)):
                 trigger = Events[i]
                 
                 latest_valid_index = mouse_pos.loc[trigger - left_period:trigger, variable].index
                 latest_valid_variable = mouse_pos.loc[latest_valid_index, [variable]].values.reshape(-1)
-                if len(latest_valid_variable) >= 10*left_seconds: latest_valid_variable  = latest_valid_variable[-10*left_seconds:]
+                if len(latest_valid_variable) >= int(10*left_seconds): latest_valid_variable  = latest_valid_variable[-int(10*left_seconds):]
                 
                 next_valid_index = mouse_pos.loc[trigger:trigger + right_period, variable].index
                 next_valid_variable = mouse_pos.loc[next_valid_index, [variable]].values.reshape(-1)
-                if len(next_valid_variable) >= 10*right_seconds: next_valid_variable  = next_valid_variable[:10*right_seconds]
+                if len(next_valid_variable) >= int(10*right_seconds): next_valid_variable  = next_valid_variable[:int(10*right_seconds)]
                 
                 if insert_nan == 1: Variable = np.concatenate((latest_valid_variable, np.array([np.nan]), next_valid_variable))
                 else: Variable = np.concatenate((latest_valid_variable, next_valid_variable))
                 
-                if len(Variable) == 10*(left_seconds + right_seconds) + insert_nan: 
+                if len(Variable) == 10*(int(left_seconds + right_seconds)) + insert_nan: 
                     VARIABLES.append(Variable)
-            return np.array(VARIABLES)
+                    Valid_Events.append(trigger)
+            if return_Events: return np.array(Valid_Events), np.array(VARIABLES)
+            else: return np.array(VARIABLES)
         
-        def Find_Event_Sequence(self, STATES):
+        def Find_Event_Sequence(self, STATES, penalty = 0):
             def most_frequent(arr):
-                count_dict = {}
-                for num in arr:
-                    if num in count_dict:
-                        count_dict[num] += 1
-                    else:
-                        count_dict[num] = 1
-                
-                max_count = 0
-                most_frequent_num = None
-                for num, count in count_dict.items():
-                    if count > max_count:
-                        max_count = count
-                        most_frequent_num = num
-                
-                return most_frequent_num
+                states, count = np.unique(arr, return_counts = True)
+                if max(count)/len(arr) < penalty: return np.nan
+                return states[np.argmax(count)]
             
-            sequence = [most_frequent(STATES.T[i]) for i in range(len(STATES[0]))]
+            #valid_start = int(len(STATES.T[0])/3)
+            valid_start = 0
+            sequence = [most_frequent(STATES.T[i][valid_start:]) for i in range(len(STATES[0]))]
             return sequence
         
-        def Compare_Sequence(self, seq1, seq2, kl_matrix, window = None):
+        def Compare_Sequence(self, seq1, seq2, kl_matrix, connecM = None):
             nx, ny = len(seq1), len(seq2)
 
             cost = np.zeros((nx + 1, ny + 1))
@@ -379,13 +384,10 @@ class HMM:
             cost[1:, 0] = np.inf
 
             for i in range(1, nx + 1):
-                if window is None:
-                    j_start, j_stop = 1, ny + 1
-                else:
-                    j_start = max(1, i - window)
-                    j_stop = min(ny + 1, i + window + 1)
+                j_start, j_stop = 1, ny + 1
                 for j in range(j_start, j_stop):
-                    cost[i, j] = kl_matrix[int(seq1[i-1]-1), int(seq2[j-1]-1)]
+                    #cost[i, j] = kl_matrix[int(seq1[i-1]), int(seq2[j-1])] * (1 - connecM[int(seq1[i-1]), int(seq2[j-1])])
+                    cost[i, j] = kl_matrix[int(seq1[i-1]), int(seq2[j-1])]
                     cost[i, j] += min(cost[i-1, j], cost[i, j-1], cost[i-1, j-1])
             
             return cost[-1, -1]
@@ -481,10 +483,17 @@ class Arena:
     def Get_Pellets(self):
         def Check_Pellet(PELLET):
             valid_rows = []
+            patch_loc = [self.patch_location['Patch' + str(i+1)] for i in range(3)]
             for time_index in PELLET.index:
                 window_start = time_index - pd.Timedelta('0.5S')
                 window_end = time_index + pd.Timedelta('0.5S')
-                has_mouse_pos = len(self.mouse.mouse_pos[window_start:window_end]['x']) > 0
+                
+                x = self.mouse.mouse_pos[window_start:window_end]['x'].to_numpy()
+                y = self.mouse.mouse_pos[window_start:window_end]['y'].to_numpy()
+                
+                patch_distance = [np.sqrt((x[0]-patch_loc[j][0])**2 + (y[0]-patch_loc[j][1])**2) for j in range(3)]
+                
+                has_mouse_pos = len(x) > 0 and min(patch_distance) < self.patch_r
                 
                 valid_rows.append(has_mouse_pos)
 
@@ -565,7 +574,7 @@ class Arena:
 
             distance = np.sqrt((mouse_pos_after['smoothed_position_x'] - patch_ox)**2 + (mouse_pos_after['smoothed_position_y'] - patch_oy)**2)
             out_of_patch = np.where(distance > self.patch_distance, 1, 0)
-            if max(out_of_patch) == 1: return False
+            if len(out_of_patch) > 0 and max(out_of_patch) == 1: return False
             else: return True
             
         def Leave_Wheel(visit_end, mouse_pos_):
@@ -608,6 +617,7 @@ class Arena:
                 if time_from_enter_arena < 0: continue
                 
                 if len(mouse_pos_[visit_start: visit_end]['x']) == 0: continue
+                if len(mouse_pos_[visit_end:visit_end + pd.Timedelta('20S')]['smoothed_position_x']) < 150: continue
                 
                 visit['start'].append(visit_start)
                 visit['end'].append(Leave_Wheel(visit_end, mouse_pos_))
@@ -629,10 +639,18 @@ class Arena:
         return visits
         
     def Combine_Visits_in_Patch(self, Visits):
+        def Check_In_Experiment(Visits):
+            mask = pd.Series(False, index=Visits.index)
+            for start, end in zip(self.mouse.experiment_starts, self.mouse.experiment_ends):
+                mask |= (Visits['start'] >= start) & (Visits['end'] <= end)
+            return Visits[mask].reset_index(drop=True)
+    
         Visits = pd.concat(Visits, ignore_index=True)
 
         Visits = Visits[Visits['duration'] >= 5]
         Visits = Visits.sort_values(by='start',ignore_index=True)  
+        
+        Visits = Check_In_Experiment(Visits)
         
         Visits['last_pellets_self'] = 0
         Visits['last_pellets_other'] = 0
@@ -669,7 +687,8 @@ class Arena:
         Visits = Visits.dropna(subset=['speed'])
         Visits = Visits[Visits['last_interval'] >= 0]
         Visits = Visits[Visits['next_interval'] >= 0]
-            
+        
+        Visits = Visits.sort_values(by='start',ignore_index=True) 
         return Visits
         
     def Get_Visits(self):
@@ -804,7 +823,7 @@ class Kinematics:
     
     def Get_Observations(self):
         active_chunk = self.mouse.active_chunk
-        mouse_pos = self.session.mouse_pos[active_chunk[0] + pd.Timedelta('3H'):active_chunk[0] + pd.Timedelta('4H')]
+        mouse_pos = self.session.mouse_pos[active_chunk[0] + pd.Timedelta('2H'):active_chunk[0] + pd.Timedelta('4H')]
         return mouse_pos
     
     def Infer_Parameters(self):
@@ -923,9 +942,11 @@ class Mouse:
         
         self.body_data_x, self.body_data_y = self.Combine_SLEAP_Data()
         self.mouse_pos = self.Get_Mouse_Pos()
+        
 
         self.arena = Arena(self)
         self.body_info = Body_Info(self)
+        self.Add_Body_Info_to_mouse_pos()
         self.hmm = HMM(self)
 
     def Get_Root(self):
@@ -1042,7 +1063,11 @@ class Mouse:
         '''mouse_pos = mouse_pos[mouse_pos['smoothed_speed']<2000]
         mouse_pos = mouse_pos[mouse_pos['smoothed_acceleration']<8000]'''
         mouse_pos = self.Exclude_Maintainance(mouse_pos)
-        return mouse_pos
+        early_period_start, early_period_end = mouse_pos.index[0], mouse_pos.index[0] + pd.Timedelta('600S')
+        valid_exp_start = early_period_start
+        for i in range(len(mouse_pos[early_period_start: early_period_end])):
+            if mouse_pos[early_period_start: early_period_end].smoothed_acceleration[i] > 2500: valid_exp_start = mouse_pos[early_period_start: early_period_end].index[i] + pd.Timedelta('20S')
+        return mouse_pos[valid_exp_start:]
     
     def Fix_Body_Info_Nan(self, mouse_pos, column):
         mouse_pos[column] = mouse_pos[column].interpolate()
@@ -1050,16 +1075,18 @@ class Mouse:
         mouse_pos[column] = mouse_pos[column].ffill()
         return mouse_pos 
 
-    def Add_Body_Info_to_mouse_pos(self, property, nodes):
-        variable = nodes[0]
-        for i in range(1, len(nodes)): variable = variable + '-' + nodes[i]
-            
-        if property == 'distance':
+    def Add_Body_Info_to_mouse_pos(self):
+        
+        NODES = [['head', 'spine3'], ['left_ear', 'spine3'],['right_ear', 'spine3'], ['spine1', 'spine3']]
+        for nodes in NODES:
+            variable = nodes[0] + '-' + nodes[1]
+
             self.mouse_pos[variable] = pd.Series(self.body_info.Process_Body_Node_Distance(nodes[0], nodes[1]), index = self.mouse_pos.index)
             self.mouse_pos = self.Fix_Body_Info_Nan(self.mouse_pos,variable)
-        if property == 'angle':
-            self.mouse_pos[variable] = pd.Series(self.body_info.Process_Body_Node_Angle(nodes[0], nodes[1], nodes[2]), index = self.mouse_pos.index)
-            self.mouse_pos = self.Fix_Body_Info_Nan(self.mouse_pos,variable)
+        
+        variable = 'right_left'
+        self.mouse_pos.loc[self.mouse_pos.index, variable] = abs(self.mouse_pos['left_ear-spine3'].to_numpy() - self.mouse_pos['right_ear-spine3'].to_numpy())
+        self.mouse_pos = self.Fix_Body_Info_Nan(self.mouse_pos, variable)
         
     def Add_Distance_to_mouse_pos(self):
         distance = np.sqrt((self.mouse_pos['smoothed_position_x'] - self.arena.origin[0]) ** 2 + (self.mouse_pos['smoothed_position_y'] - self.arena.origin[1]) ** 2)
@@ -1176,6 +1203,10 @@ class Session:
             
         x_acc, y_acc = smoothRes['xnN'][2][0], smoothRes['xnN'][5][0]
         acc = np.sqrt(x_acc**2 + y_acc**2)
+        '''
+        speed_diff = np.diff(vel)
+        mask = np.concatenate(([0], np.sign(speed_diff)))
+        '''
         self.mouse_pos['smoothed_acceleration'] = pd.Series(acc, index=self.mouse_pos.index)
         
 
