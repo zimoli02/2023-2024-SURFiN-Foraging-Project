@@ -2,9 +2,8 @@ Report/
 Images/
 Videos/
 SfNPoster/
-Scripts/job.sh
-Scripts/LDSParams.py
-Scripts/EventFrame.py
-Scripts/CheckPost045.py
-Scripts/Videos.py
-Scripts/Social_Example.ipynb
+Scripts/*
+!Scripts/__init__.py
+!Scripts/AllMice.py
+!Scripts/SingleMouse.py
+!Scripts/README.md
